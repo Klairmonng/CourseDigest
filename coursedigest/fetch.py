@@ -5,6 +5,7 @@ import json
 import logging
 import posixpath
 import re
+import subprocess
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -148,12 +149,18 @@ def browser(root: Path, headless: bool = True):
             context.close()
 
 
+def login_command(executable: str, profile: Path) -> list[str]:
+    """A plain Chromium window on the tool's profile: no automation attached, so Google sign-in is allowed."""
+    return [executable, f"--user-data-dir={profile}", "--no-first-run", "--no-default-browser-check", BASE]
+
+
 def login(root: Path) -> None:
-    """Open the site in a visible browser; returns when the user closes the window."""
-    with browser(root, headless=False) as context:
-        page = context.pages[0] if context.pages else context.new_page()
-        page.goto(BASE)
-        page.wait_for_event("close", timeout=0)
+    """Open the site in a normal browser window on the tool's profile; returns when the user closes it."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        executable = playwright.chromium.executable_path
+    subprocess.run(login_command(executable, root / PROFILE_DIR), check=False)
 
 
 def page_data(context, url: str) -> dict:

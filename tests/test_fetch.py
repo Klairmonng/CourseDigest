@@ -45,6 +45,13 @@ def test_lab_location_and_paths():
     assert not fetch.is_graded("M2/ungraded_labs/L1") and not fetch.is_graded("Ungraded_Labs")
 
 
+def test_login_window_is_not_automated(tmp_path):
+    command = fetch.login_command("chrome.exe", tmp_path / ".profile")
+    assert command[0] == "chrome.exe" and command[-1] == fetch.BASE
+    assert f"--user-data-dir={tmp_path / '.profile'}" in command
+    assert not any("remote-debugging" in arg or "automation" in arg for arg in command)
+
+
 def test_requirements_from_markdown():
     md = "Steps:\n```bash\npip install -r requirements.txt\n```\n```txt\n# tools\naisuite==0.1.11\nanthropic\n\npydantic[email]\n" \
          "tavily-python>=0.7.12\nWikipedia\n```"

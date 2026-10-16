@@ -1,6 +1,6 @@
 # ADR-001: Course data from `__NEXT_DATA__` through a logged-in Playwright profile
 
-**Status:** Accepted · **Date:** 2026-10-16 · **Feature:** coursedigest-v1 · **Author:** 10x-Team (Architect + Staff Engineer)
+**Status:** Accepted (login step superseded by ADR-004) · **Date:** 2026-10-16 · **Feature:** coursedigest-v1 · **Author:** 10x-Team (Architect + Staff Engineer)
 
 ## Context
 Lessons sit behind the user's login on learn.deeplearning.ai. Each lesson page is server-rendered (Next.js) and embeds a tRPC state in `<script id="__NEXT_DATA__">` holding `course.getCourseBySlug` (every lesson: slug, name, type, seconds; `listing` = modules in order) and `course.getLessonVideoSubtitle` (captions with start/end seconds). Ungraded labs open a Jupyter server in an iframe whose URL carries a session token.
