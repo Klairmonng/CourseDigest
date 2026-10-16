@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coursedigest"
+version = "0.1.0"
+description = "Digest DeepLearning.AI courses into short visual study sites"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic",
+    "jinja2",
+    "nbformat",
+    "playwright",
+    "pydantic>=2",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = ["openai", "pytest"]
+
+[project.scripts]
+coursedigest = "coursedigest.cli:main"
+
+[tool.setuptools]
+packages = ["coursedigest"]
+
+[tool.setuptools.package-data]
+coursedigest = ["templates/*.j2"]
