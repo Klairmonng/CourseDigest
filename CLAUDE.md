@@ -14,6 +14,7 @@ Turn ~10-hour DeepLearning.AI courses (3-4 learning paths) into short, visual, p
 # STRUCTURE
 - `coursedigest/` - the CLI (`coursedigest login | fetch | digest | labs | site | all`)
   - `fetch.py` - DeepLearning.AI fetcher: logged-in browser profile, lesson data and captions from the page's `__NEXT_DATA__`, ungraded lab files from the lab's Jupyter server
+  - `claude.py` - the one structured Claude call helper + cache key
   - `digest.py` - Claude digest per lesson + one course-level synthesis, cached by input hash
   - `labs.py` - runs ungraded labs in `labs/.venv` with `shim.py` loaded at kernel start, then has Claude write a walkthrough
   - `shim.py` - routes the labs' OpenAI / aisuite / Anthropic calls to Claude and records each call to `trace.jsonl`
