@@ -1,0 +1,11 @@
+.env
+.venv/
+labs/.venv/
+cache/
+site/
+.profile/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
