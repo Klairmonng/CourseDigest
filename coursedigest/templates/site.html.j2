@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ course.name }} Digest</title>
+<style>
+:root{--bg:#f6f6f3;--panel:#fff;--ink:#1c1c1f;--muted:#66666d;--line:#e3e2dc;--accent:#3451d1;--accent-soft:#e8ecff;
+--good:#0c7a5a;--good-soft:#ddf3ea;--skip:#8d8d94;--skip-soft:#efefec;--lab:#7a3fc2;--lab-soft:#f1e8fc;--warn:#b54708;
+--warn-soft:#fdeedd;--code:#f0efea;--shadow:0 1px 2px rgba(0,0,0,.05)}
+@media (prefers-color-scheme:dark){:root{--bg:#131316;--panel:#1c1c21;--ink:#ececf1;--muted:#a3a3ad;--line:#2d2d34;
+--accent:#8fa3ff;--accent-soft:#232a48;--good:#62d2a8;--good-soft:#173328;--skip:#7c7c85;--skip-soft:#25252b;--lab:#c39bff;
+--lab-soft:#2c2240;--warn:#f4a35e;--warn-soft:#3a2716;--code:#24242a;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+header,main,nav .in{max-width:980px;margin:0 auto;padding:0 16px}
+header{padding-top:36px;padding-bottom:20px}
+h1{font-size:30px;line-height:1.2;margin:0 0 8px}
+h2{font-size:22px;margin:44px 0 14px}
+h3{font-size:18px;margin:4px 0 6px;line-height:1.3}
+.sub{color:var(--muted);margin:0}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;box-shadow:var(--shadow)}
+.stat b{display:block;font-size:20px}
+.stat span{color:var(--muted);font-size:13px}
+nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);
+border-bottom:1px solid var(--line)}
+nav .in{display:flex;gap:4px;overflow-x:auto;padding-top:8px;padding-bottom:8px;scrollbar-width:none}
+nav .in::-webkit-scrollbar{display:none}
+nav a{text-decoration:none;color:var(--ink);padding:5px 12px;border-radius:999px;white-space:nowrap;font-size:14px}
+nav a:hover{background:var(--accent-soft)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0;
+box-shadow:var(--shadow)}
+.meta{color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:1px 9px;border-radius:999px}
+.imp-must .badge.imp,.chip.must{background:var(--accent-soft);color:var(--accent)}
+.imp-good .badge.imp,.chip.good{background:var(--good-soft);color:var(--good)}
+.imp-skip .badge.imp,.chip.skip{background:var(--skip-soft);color:var(--skip)}
+.chip.lab,.badge.lab{background:var(--lab-soft);color:var(--lab)}
+.chip.none{background:transparent;color:var(--skip);border:1px dashed var(--line)}
+.badge.err{background:var(--warn-soft);color:var(--warn)}
+.badge.ok{background:var(--good-soft);color:var(--good)}
+.lesson.imp-must{border-left:4px solid var(--accent)}
+.lesson.imp-good{border-left:4px solid var(--good)}
+.lesson.imp-skip{border-left:4px solid var(--skip)}
+.card.lab{border-left:4px solid var(--lab)}
+.tldr{font-weight:600;margin:6px 0 10px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.ideas{padding-left:18px;margin:8px 0}
+.ideas li{margin:4px 0}
+figure{margin:0}
+figcaption{color:var(--muted);font-size:12.5px;text-align:center;margin-top:4px}
+.dg{width:100%;height:auto;display:block;margin:0 auto}
+.dg-box{fill:var(--panel);stroke:var(--accent);stroke-width:1.4}
+.dg-hub{fill:var(--accent-soft);stroke-width:2}
+.dg-layer{fill:var(--accent-soft)}
+.dg-label{font:600 13px system-ui,sans-serif;fill:var(--ink)}
+.dg-note{font:11.5px system-ui,sans-serif;fill:var(--muted)}
+.dg-group{font:700 13px system-ui,sans-serif;fill:var(--accent)}
+.dg-edge,.dg-spoke{stroke:var(--muted);stroke-width:1.5;fill:none}
+.dg-loop{stroke-dasharray:5 4}
+.dg-edge-label{font:11px system-ui,sans-serif;fill:var(--muted);paint-order:stroke;stroke:var(--panel);stroke-width:4px}
+.dg-arrowhead{fill:var(--muted)}
+details{border-top:1px solid var(--line);margin-top:12px;padding-top:8px}
+summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.takeaway{font-weight:600}
+.watch{margin-top:10px;font-size:14px}
+.moment{display:block;margin:3px 0}
+.moment b{font-variant-numeric:tabular-nums;color:var(--accent)}
+.terms{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.term{font-size:12.5px;background:var(--code);border-radius:6px;padding:2px 8px;cursor:help}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+button,.btn{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+border-radius:999px;padding:5px 14px;cursor:pointer}
+button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+input[type=search]{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+border-radius:999px;padding:5px 14px;min-width:0;flex:1 1 180px}
+.module{display:grid;grid-template-columns:220px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+@media (max-width:760px){.module{grid-template-columns:1fr}}
+.module h4{margin:0;font-size:14px}
+.module p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;text-decoration:none;padding:3px 10px;border-radius:999px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:13px;color:var(--muted)}
+.takeaways li{margin:6px 0}
+.steps{list-style:none;padding:0;margin:12px 0;counter-reset:s}
+.steps>li{position:relative;padding:0 0 14px 38px;border-left:2px solid var(--line);margin-left:12px}
+.steps>li:last-child{border-left-color:transparent}
+.steps>li::before{counter-increment:s;content:counter(s);position:absolute;left:-13px;top:0;width:24px;height:24px;
+border-radius:50%;background:var(--lab);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center}
+.steps h5{margin:0 0 2px;font-size:15px}
+.steps p{margin:2px 0}
+code{background:var(--code);border-radius:5px;padding:1px 6px;font-size:13px}
+.shot{max-width:100%;border:1px solid var(--line);border-radius:8px;margin-top:8px;display:block}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.callref{font-size:12px;padding:1px 9px;margin:4px 4px 0 0}
+.call{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:13.5px}
+.call .head{color:var(--muted);font-size:12.5px;margin-bottom:6px}
+.call pre{white-space:pre-wrap;word-break:break-word;background:var(--code);border-radius:8px;padding:8px 10px;
+margin:4px 0;max-height:320px;overflow:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace}
+.call .k{font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.call img{max-width:260px;display:block;border-radius:6px;margin:6px 0}
+.call.flash{outline:2px solid var(--lab)}
+dl.gloss dt{font-weight:700;margin-top:12px}
+dl.gloss dd{margin:2px 0 0;color:var(--ink)}
+dl.gloss dd small{color:var(--muted)}
+.flash-card{min-height:180px;display:grid;place-items:center;text-align:center;font-size:18px;cursor:pointer;
+padding:28px;user-select:none}
+.flash-card .a{color:var(--good)}
+.flash-card small{display:block;color:var(--muted);font-size:13px;margin-top:10px}
+.muted{color:var(--muted)}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><marker id="cd-arrow" viewBox="0 0 10 10"
+refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="dg-arrowhead"
+d="M0,0 L10,5 L0,10 z"/></marker></defs></svg>
+
+<header>
+  <h1>{{ course.name }}</h1>
+  <p class="sub">A short, visual digest of the course. Generated {{ digest.generated_at[:10] }} with {{ digest.model }}.</p>
+  <div class="stats">
+    <div class="stat"><b>{{ video_minutes // 60 }} h {{ video_minutes % 60 }} min</b><span>of course time</span></div>
+    <div class="stat"><b>~{{ read_minutes }} min</b><span>to read these notes</span></div>
+    <div class="stat"><b>{{ digest.lessons | selectattr("status", "equalto", "ok") | list | length }}</b><span>lessons digested</span></div>
+    <div class="stat"><b>{{ labs | length }}</b><span>labs run and explained</span></div>
+  </div>
+</header>
+
+<nav><div class="in">
+  <a href="#overview">Overview</a><a href="#map">Course map</a><a href="#lessons">Lessons</a>
+  {% if labs %}<a href="#labs">Labs</a>{% endif %}<a href="#glossary">Glossary</a><a href="#flashcards">Flashcards</a>
+</div></nav>
+
+<main>
+<section id="overview">
+  <h2>The big picture</h2>
+  {% if notes %}
+  <div class="card">
+    <p>{{ notes.big_picture }}</p>
+    <figure>{{ notes.concept_map | diagram }}<figcaption>{{ notes.concept_map.title }}</figcaption></figure>
+  </div>
+  <div class="card">
+    <h3>Top takeaways</h3>
+    <ol class="takeaways">{% for t in notes.top_takeaways %}<li>{{ t }}</li>{% endfor %}</ol>
+  </div>
+  {% else %}<p class="muted">The course overview was not generated.</p>{% endif %}
+</section>
+
+<section id="map">
+  <h2>Course map</h2>
+  <div class="legend"><span class="chip must">Must know</span><span class="chip good">Good to know</span>
+    <span class="chip skip">Skippable</span><span class="chip lab">Lab</span><span class="chip none">Not covered (quiz / graded)</span></div>
+  <div class="card">
+  {% for m in course.modules %}
+    <div class="module">
+      <div><h4>{{ m.label }}{% if m.label and m.name %}: {% endif %}{{ m.name }}</h4>
+        {% if notes %}{% for o in notes.module_overviews if o.module in (m.name, m.label ~ ' - ' ~ m.name, m.label) %}<p>{{ o.one_liner }}</p>{% endfor %}{% endif %}</div>
+      <div class="chips">
+      {% for slug in m.lessons %}{% set meta = course.lessons[slug] %}
+        {% if slug in lessons and lessons[slug].notes %}<a class="chip {{ lessons[slug].notes.importance }}" href="#l-{{ slug }}">{{ meta.name }}</a>
+        {% elif slug in lab_slugs %}<a class="chip lab" href="#lab-{{ slug }}">{{ meta.name }}</a>
+        {% else %}<span class="chip none" title="{{ meta.type }}">{{ meta.name }}</span>{% endif %}
+      {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+</section>
+
+<section id="lessons">
+  <h2>Lessons</h2>
+  <div class="toolbar">
+    <button data-imp="must" aria-pressed="false">Must know</button>
+    <button data-imp="must good" aria-pressed="false">Must + good</button>
+    <button data-imp="all" aria-pressed="true">All</button>
+    <input type="search" id="lesson-search" placeholder="Search lessons" aria-label="Search lessons">
+  </div>
+  {% for l in digest.lessons %}{% set n = l.notes %}
+  {% if n %}
+  <article class="card lesson imp-{{ n.importance }}" id="l-{{ l.slug }}" data-imp="{{ n.importance }}"
+           data-text="{{ (l.title ~ ' ' ~ n.tldr ~ ' ' ~ n.summary) | lower }}">
+    <div class="meta"><span class="badge imp">{{ {'must': 'Must know', 'good': 'Good to know', 'skip': 'Skippable'}[n.importance] }}</span>
+      <span>{{ l.module }}</span><span>{{ l.minutes }} min {{ l.kind }}</span><a href="{{ l.url }}" target="_blank" rel="noopener">Open lesson</a></div>
+    <h3>{{ l.title }}</h3>
+    <p class="tldr">{{ n.tldr }}</p>
+    <div class="cols">
+      <div>
+        <p>{{ n.summary }}</p>
+        <ul class="ideas">{% for k in n.key_ideas %}<li><b>{{ k.idea }}.</b> {{ k.detail }}</li>{% endfor %}</ul>
+      </div>
+      <figure>{{ n.diagram | diagram }}<figcaption>{{ n.diagram.title }}</figcaption></figure>
+    </div>
+    <details><summary>Worked example: {{ n.example.title }}</summary>
+      <p>{{ n.example.scenario }}</p>
+      <ol>{% for s in n.example.steps %}<li>{{ s }}</li>{% endfor %}</ol>
+      <p class="takeaway">{{ n.example.takeaway }}</p>
+    </details>
+    {% if n.watch %}<div class="watch"><b>Worth watching</b>{% for w in n.watch %}
+      <span class="moment"><b>{{ w.start | clock }}-{{ w.end | clock }}</b> {{ w.why }}</span>{% endfor %}</div>{% endif %}
+    <p class="muted" style="font-size:13px;margin:10px 0 0">{{ n.importance_reason }}</p>
+    {% if n.terms %}<div class="terms">{% for t in n.terms %}<span class="term" title="{{ t.definition }}">{{ t.term }}</span>{% endfor %}</div>{% endif %}
+  </article>
+  {% else %}
+  <article class="card lesson imp-skip" id="l-{{ l.slug }}" data-imp="skip" data-text="{{ l.title | lower }}">
+    <div class="meta"><span class="badge err">{{ 'No transcript' if l.status == 'no_transcript' else 'Not digested' }}</span><span>{{ l.module }}</span></div>
+    <h3>{{ l.title }}</h3>{% if l.error %}<p class="muted">{{ l.error }}</p>{% endif %}
+  </article>
+  {% endif %}
+  {% endfor %}
+</section>
+
+{% if labs %}
+<section id="labs">
+  <h2>Labs</h2>
+  <p class="muted">Each ungraded lab was run end to end; {{ digest.model }} answered the model calls the lab makes. The numbered calls are the real requests from our run.</p>
+  {% for w, trace in labs %}{% set n = w.notes %}
+  <article class="card lab" id="lab-{{ w.slug }}" data-folder="{{ w.folder }}">
+    <div class="meta"><span class="badge lab">Lab</span><span>{{ w.module }}</span>
+      {% if w.run.status == 'ok' %}<span class="badge ok">Ran cleanly</span>
+      {% elif w.run.status == 'errors' %}<span class="badge err">{{ w.run.errors }} cell error{{ 's' if w.run.errors != 1 }}</span>
+      {% else %}<span class="badge err">Did not run</span>{% endif %}
+      <span>{{ w.run.calls }} model calls</span><span>{{ (w.run.seconds / 60) | round(1) }} min</span></div>
+    <h3>{{ w.title }}</h3>
+    {% if n %}
+    <p><span class="badge lab">{{ n.pattern }}</span></p>
+    <p class="tldr">{{ n.goal }}</p>
+    <figure>{{ n.diagram | diagram }}<figcaption>{{ n.diagram.title }}</figcaption></figure>
+    <ol class="steps">
+    {% for s in n.steps %}
+      <li><h5>{{ s.title }}</h5><p>{{ s.what_happens }}</p>
+        {% if s.code_ref %}<p><code>{{ s.code_ref }}</code></p>{% endif %}
+        {% for r in s.call_refs %}<button class="callref" data-call="{{ r }}">Call #{{ r }}</button>{% endfor %}
+        {% if s.image and s.image in w.images %}<img class="shot" loading="lazy" alt="{{ s.title }}" src="assets/{{ w.folder }}/outputs/{{ s.image }}">{% endif %}
+      </li>
+    {% endfor %}
+    </ol>
+    <p><b>What happened in our run.</b> {{ n.results }}</p>
+    {% if n.try_next %}<p><b>Try next</b></p><ul>{% for t in n.try_next %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+    {% else %}<p class="muted">{{ w.run.message or 'No walkthrough was generated.' }}</p>{% endif %}
+    {% if w.images %}<details><summary>All outputs ({{ w.images | length }})</summary><div class="gallery">
+      {% for img in w.images %}<img class="shot" loading="lazy" alt="{{ img }}" src="assets/{{ w.folder }}/outputs/{{ img }}">{% endfor %}</div></details>{% endif %}
+    {% if trace %}<details class="trace"><summary>Model-call trace ({{ trace | length }})</summary><div class="calls"></div></details>{% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section id="glossary">
+  <h2>Glossary</h2>
+  <div class="toolbar"><input type="search" id="gloss-search" placeholder="Search {{ glossary | length }} terms" aria-label="Search terms"></div>
+  <div class="card"><dl class="gloss">
+  {% for t in glossary %}<div class="g" data-text="{{ (t.term ~ ' ' ~ t.definition) | lower }}"><dt>{{ t.term }}</dt>
+    <dd>{{ t.definition }} <small>({{ t.lesson }})</small></dd></div>{% endfor %}
+  </dl></div>
+</section>
+
+<section id="flashcards">
+  <h2>Flashcards</h2>
+  <div class="toolbar">
+    <button id="fc-must" aria-pressed="false">Must-know only</button><button id="fc-shuffle">Shuffle</button>
+    <button id="fc-prev">Previous</button><button id="fc-next">Next</button><span class="muted" id="fc-pos"></span>
+  </div>
+  <div class="card flash-card" id="fc-card" tabindex="0" role="button" aria-label="Flip card"></div>
+</section>
+</main>
+
+<script type="application/json" id="cd-data">{{ data }}</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('cd-data').textContent);
+
+  // lessons: importance filter + search
+  const cards = [...document.querySelectorAll('#lessons .lesson')];
+  const buttons = [...document.querySelectorAll('#lessons [data-imp]')].filter(b => b.tagName === 'BUTTON');
+  const search = document.getElementById('lesson-search');
+  let allowed = 'all';
+  const applyLessons = () => {
+    const q = search.value.trim().toLowerCase();
+    for (const c of cards) {
+      const okImp = allowed === 'all' || allowed.split(' ').includes(c.dataset.imp);
+      c.classList.toggle('hidden', !(okImp && (!q || c.dataset.text.includes(q))));
+    }
+  };
+  buttons.forEach(b => b.addEventListener('click', () => {
+    allowed = b.dataset.imp;
+    buttons.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    applyLessons();
+  }));
+  search.addEventListener('input', applyLessons);
+
+  // glossary search
+  const gloss = [...document.querySelectorAll('.g')];
+  document.getElementById('gloss-search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    gloss.forEach(g => g.classList.toggle('hidden', !!q && !g.dataset.text.includes(q)));
+  });
+
+  // lab traces: built with textContent, images only from the copied assets folder
+  const safeImage = /^assets\/[\w.\-\/]+$/;
+  const withImages = (text, parent) => {
+    const pre = document.createElement('pre');
+    for (const part of text.split(/(\[image: [^\]]+\])/)) {
+      const m = part.match(/^\[image: ([^\]]+)\]$/);
+      if (m && safeImage.test(m[1])) { const img = document.createElement('img'); img.src = m[1]; img.alt = 'image sent to the model'; pre.append(img); }
+      else pre.append(document.createTextNode(part));
+    }
+    parent.append(pre);
+  };
+  const renderCalls = (article) => {
+    const box = article.querySelector('.calls');
+    if (!box || box.childElementCount) return box;
+    for (const t of data.traces[article.dataset.folder] || []) {
+      const el = document.createElement('div'); el.className = 'call'; el.id = `${article.id}-call-${t.i}`;
+      const head = document.createElement('div'); head.className = 'head';
+      head.textContent = `#${t.i} · ${t.api} · lab asked for ${t.requested_model || 'a model'} · ${t.usage.input_tokens} in / ${t.usage.output_tokens} out tokens · ${(t.ms / 1000).toFixed(1)} s` + (t.error ? ` · ERROR: ${t.error}` : '');
+      el.append(head);
+      for (const [label, value] of [['System', t.system], ['Input', t.input], ['Output', t.output]]) {
+        if (!value) continue;
+        const k = document.createElement('div'); k.className = 'k'; k.textContent = label; el.append(k); withImages(value, el);
+      }
+      if (t.tool_calls.length) {
+        const k = document.createElement('div'); k.className = 'k'; k.textContent = 'Tool calls'; el.append(k);
+        const pre = document.createElement('pre'); pre.textContent = t.tool_calls.map(c => `${c.name}(${c.arguments})`).join('\n'); el.append(pre);
+      }
+      box.append(el);
+    }
+    return box;
+  };
+  document.querySelectorAll('#labs details.trace').forEach(d => d.addEventListener('toggle', () => d.open && renderCalls(d.closest('article'))));
+  document.querySelectorAll('.callref').forEach(b => b.addEventListener('click', () => {
+    const article = b.closest('article');
+    renderCalls(article);
+    const details = article.querySelector('details.trace'); if (details) details.open = true;
+    const target = document.getElementById(`${article.id}-call-${b.dataset.call}`);
+    if (target) { target.scrollIntoView({behavior: 'smooth', block: 'center'}); target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1600); }
+  }));
+
+  // flashcards
+  const cardEl = document.getElementById('fc-card'), pos = document.getElementById('fc-pos'), mustBtn = document.getElementById('fc-must');
+  let deck = data.flashcards.slice(), i = 0, flipped = false;
+  const show = () => {
+    cardEl.replaceChildren();
+    if (!deck.length) { cardEl.textContent = 'No flashcards.'; pos.textContent = ''; return; }
+    const c = deck[i], main = document.createElement('div'), note = document.createElement('small');
+    main.textContent = flipped ? c.a : c.q; main.className = flipped ? 'a' : 'q';
+    note.textContent = flipped ? c.lesson : 'Click or press Space to reveal';
+    cardEl.append(main, note); pos.textContent = `${i + 1} / ${deck.length}`;
+  };
+  const flip = () => { flipped = !flipped; show(); };
+  cardEl.addEventListener('click', flip);
+  cardEl.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } });
+  document.getElementById('fc-next').addEventListener('click', () => { i = (i + 1) % Math.max(1, deck.length); flipped = false; show(); });
+  document.getElementById('fc-prev').addEventListener('click', () => { i = (i - 1 + deck.length) % Math.max(1, deck.length); flipped = false; show(); });
+  document.getElementById('fc-shuffle').addEventListener('click', () => { deck.sort(() => Math.random() - .5); i = 0; flipped = false; show(); });
+  mustBtn.addEventListener('click', () => {
+    const on = mustBtn.getAttribute('aria-pressed') !== 'true';
+    mustBtn.setAttribute('aria-pressed', String(on));
+    deck = data.flashcards.filter(c => !on || c.importance === 'must'); i = 0; flipped = false; show();
+  });
+  show();
+})();
+</script>
+</body>
+</html>

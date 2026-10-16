@@ -1,0 +1,134 @@
+{
+  "slug": "uz37vtiou",
+  "title": "Ungraded Lab: Chart Generation",
+  "module": "Module 2 - Reflection Design Pattern",
+  "folder": "15-M2_UGL_1",
+  "run": {
+    "status": "ok",
+    "cells": 10,
+    "errors": 0,
+    "calls": 4,
+    "input_tokens": 4238,
+    "output_tokens": 1881,
+    "seconds": 103,
+    "message": ""
+  },
+  "images": [
+    "cell14-d8a954e7.png",
+    "cell21-377e423a.png",
+    "cell25-654f243b.png",
+    "cell25-0e8398ee.png"
+  ],
+  "notes": {
+    "goal": "Build an agentic pipeline that generates a Python chart, executes it, visually reflects on the output using a multimodal LLM, and refines the code to improve the chart.",
+    "pattern": "Reflection",
+    "diagram": {
+      "kind": "flow",
+      "title": "Chart Generation Reflection Workflow",
+      "nodes": [
+        {
+          "id": "load",
+          "label": "Load Dataset",
+          "note": "Read coffee sales csv",
+          "group": ""
+        },
+        {
+          "id": "gen1",
+          "label": "Generate Code V1",
+          "note": "LLM writes matplotlib script",
+          "group": ""
+        },
+        {
+          "id": "exec1",
+          "label": "Execute Code V1",
+          "note": "Run script to save chart_v1.png",
+          "group": ""
+        },
+        {
+          "id": "reflect",
+          "label": "Reflect and Critique",
+          "note": "Multimodal LLM reviews image and code",
+          "group": ""
+        },
+        {
+          "id": "exec2",
+          "label": "Execute Code V2",
+          "note": "Run refined script to save chart_v2.png",
+          "group": ""
+        }
+      ],
+      "edges": [
+        {
+          "source": "load",
+          "target": "gen1",
+          "label": "schema"
+        },
+        {
+          "source": "gen1",
+          "target": "exec1",
+          "label": "python code"
+        },
+        {
+          "source": "exec1",
+          "target": "reflect",
+          "label": "chart image"
+        },
+        {
+          "source": "reflect",
+          "target": "exec2",
+          "label": "refined code"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "title": "Setup and Dataset Loading",
+        "what_happens": "Imports standard libraries and loads the coffee sales dataset into a pandas DataFrame, checking a random sample to understand its schema.",
+        "code_ref": "utils.load_and_prepare_data",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Generate Initial Code (V1)",
+        "what_happens": "Prompts an LLM to write Python code using matplotlib that answers the user's request and wraps the code inside <execute_python> tags.",
+        "code_ref": "generate_chart_code",
+        "call_refs": [
+          1,
+          3
+        ],
+        "image": ""
+      },
+      {
+        "title": "Execute Code and Create V1 Chart",
+        "what_happens": "Extracts the Python code snippet from the LLM response via regular expressions, executes it against the DataFrame, and saves the resulting image as chart_v1.png.",
+        "code_ref": "exec",
+        "call_refs": [],
+        "image": "cell14-d8a954e7.png"
+      },
+      {
+        "title": "Reflect on Output",
+        "what_happens": "Sends the generated chart image and original code to a multimodal LLM to critique readability, missing data alignment, and labels, returning JSON feedback and revised code.",
+        "code_ref": "reflect_on_image_and_regenerate",
+        "call_refs": [
+          2,
+          4
+        ],
+        "image": ""
+      },
+      {
+        "title": "Execute Improved Code (V2)",
+        "what_happens": "Extracts the newly refined code from the reflection step, executes it to fix data handling issues, and renders the polished chart_v2.png.",
+        "code_ref": "run_workflow",
+        "call_refs": [],
+        "image": "cell21-377e423a.png"
+      }
+    ],
+    "results": "All code cells executed successfully without errors. The workflow correctly generated the first draft chart, spotted missing data index alignment through visual reflection, and produced an improved V2 chart.",
+    "try_next": [
+      "Change the user instructions to plot a different relationship, such as top-selling coffee types by revenue.",
+      "Switch the reflection model to a different LLM like Claude to compare critique styles.",
+      "Modify the hard constraints in the reflection prompt to enforce a specific color palette.",
+      "Add a second reflection loop to test multi-step iterative refinement."
+    ]
+  }
+}

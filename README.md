@@ -8,13 +8,13 @@ Digests a DeepLearning.AI course into a short visual site: plain-English lesson 
 py -3.11 -m venv .venv
 .venv\Scripts\pip install -e .[dev]
 .venv\Scripts\playwright install chromium
-copy .env.example .env   # then fill in ANTHROPIC_API_KEY and TAVILY_API_KEY
+copy .env.example .env   # then fill in GEMINI_API_KEY (free: aistudio.google.com) and TAVILY_API_KEY
 ```
 
 ## Use
 
 ```bash
-coursedigest login                                                    # once: sign in in the window that opens
+coursedigest login                                                    # once, from your own terminal: sign in, close the window
 coursedigest all https://learn.deeplearning.ai/courses/agentic-ai     # fetch + digest + labs + site
 ```
 
