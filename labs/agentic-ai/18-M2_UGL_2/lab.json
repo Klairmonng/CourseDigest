@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "index": 18,
+    "slug": "2ftgl7o8f",
+    "name": "Ungraded Lab: Improving SQL Generation with Reflection",
+    "type": "notebook",
+    "seconds": 900,
+    "module": "Module 2 - Reflection Design Pattern"
+  },
+  "notebook": "M2_UGL_2.ipynb",
+  "source_dir": "M2/ungraded_labs/M2_UGL_2"
+}

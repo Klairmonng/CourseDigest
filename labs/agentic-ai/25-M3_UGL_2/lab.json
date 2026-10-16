@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "index": 25,
+    "slug": "shknqak",
+    "name": "Ungraded Lab: Email Assistant Workflow",
+    "type": "notebook",
+    "seconds": 900,
+    "module": "Module 3 - Tool use"
+  },
+  "notebook": "M3_UGL_2.ipynb",
+  "source_dir": "M3/ungraded_labs/M3_UGL_2"
+}

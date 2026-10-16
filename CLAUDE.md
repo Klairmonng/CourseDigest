@@ -21,7 +21,7 @@ Turn ~10-hour DeepLearning.AI courses (3-4 learning paths) into short, visual, p
   - `site.py` + `templates/` - static visual site per course
   - `models.py` - data contracts (pydantic)
 - `digests/<course>.json` - committed digests
-- `labs/<course>/<lab>/` - lab files, executed notebook, trace, walkthrough
+- `labs/<course>/<lab>/` - lab files, executed notebook, trace, walkthrough; `coursedigest.json` = per-lab services/env the course platform provides (rerun one lab: `labs <course> --only <NN>`)
 - `tests/` - pytest
 - `.10x/` - team decisions, ADRs, specs
 - Local only (gitignored): `.env`, `.venv/`, `labs/.venv/`, `cache/`, `site/`, `.profile/`

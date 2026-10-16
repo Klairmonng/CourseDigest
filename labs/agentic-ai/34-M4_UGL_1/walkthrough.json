@@ -1,0 +1,132 @@
+{
+  "slug": "nae3i1ymg",
+  "title": "Ungraded Lab: Adding a component-level eval to the research workflow",
+  "module": "Module 4 - Practical Tips for Building Agentic AI",
+  "folder": "34-M4_UGL_1",
+  "run": {
+    "status": "ok",
+    "cells": 6,
+    "errors": 0,
+    "calls": 7,
+    "input_tokens": 7466,
+    "output_tokens": 1144,
+    "seconds": 215,
+    "message": ""
+  },
+  "images": [],
+  "notes": {
+    "goal": "Build a component-level evaluation workflow that checks whether web search references originate from trusted, preferred domains.",
+    "pattern": "Component-level evaluation",
+    "diagram": {
+      "kind": "flow",
+      "title": "Search and Evaluate Workflow",
+      "nodes": [
+        {
+          "id": "setup",
+          "label": "Import libraries and client",
+          "note": "Initialize environment",
+          "group": ""
+        },
+        {
+          "id": "search",
+          "label": "Run find_references tool",
+          "note": "Query arxiv and tavily",
+          "group": ""
+        },
+        {
+          "id": "extract",
+          "label": "Extract URLs",
+          "note": "Parse text for links",
+          "group": ""
+        },
+        {
+          "id": "eval",
+          "label": "Evaluate domains",
+          "note": "Compare against TOP_DOMAINS",
+          "group": ""
+        },
+        {
+          "id": "report",
+          "label": "Display pass or fail",
+          "note": "Generate markdown summary",
+          "group": ""
+        }
+      ],
+      "edges": [
+        {
+          "source": "setup",
+          "target": "search",
+          "label": "start task"
+        },
+        {
+          "source": "search",
+          "target": "extract",
+          "label": "get text output"
+        },
+        {
+          "source": "extract",
+          "target": "eval",
+          "label": "compute ratio"
+        },
+        {
+          "source": "eval",
+          "target": "report",
+          "label": "pass fail flag"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "title": "Setup environment",
+        "what_happens": "Imports necessary standard, third-party libraries, and AISuite client to prepare for running research tasks.",
+        "code_ref": "Client",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Research Step",
+        "what_happens": "Defines and tests the `find_references` function, which uses AISuite to query tools like Arxiv and Tavily for recent black hole science papers.",
+        "code_ref": "find_references",
+        "call_refs": [
+          1,
+          2,
+          3
+        ],
+        "image": ""
+      },
+      {
+        "title": "Evaluation Step",
+        "what_happens": "Defines a list of trusted domains and an evaluation function that extracts URLs from text, checks them against the trusted list, and computes a score.",
+        "code_ref": "evaluate_tavily_results",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Test Evaluation",
+        "what_happens": "Runs the research task, passes its output to the evaluation function, and prints out a clear markdown summary with a PASS or FAIL status.",
+        "code_ref": "evaluate_tavily_results",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Try It Yourself",
+        "what_happens": "Allows experimenting with a different research topic, customized list of preferred domains, and adjusted threshold ratio.",
+        "code_ref": "topic",
+        "call_refs": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "image": ""
+      }
+    ],
+    "results": "The lab successfully executed the model calls, automatically handling tool errors (like rate limits on Arxiv) by falling back to Tavily web search. The final outputs retrieved relevant black hole papers and successfully evaluated their source URLs against the preferred domain list.",
+    "try_next": [
+      "Change the topic string to a completely different domain like quantum computing or renewable energy.",
+      "Modify the min_ratio threshold to 0.8 to see if stricter requirements cause the evaluation to fail.",
+      "Add a new domain like 'sciencedirect.com' to the TOP_DOMAINS set and check how the score changes.",
+      "Write a loop to test 3 different research prompts automatically and print their evaluation flags."
+    ]
+  }
+}

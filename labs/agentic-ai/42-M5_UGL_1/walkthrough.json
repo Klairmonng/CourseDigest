@@ -1,0 +1,122 @@
+{
+  "slug": "9inumthkb",
+  "title": "Ungraded Lab: Customer Service Agent",
+  "module": "Module 5 - Patterns for Highly Autonomous Agents",
+  "folder": "42-M5_UGL_1",
+  "run": {
+    "status": "ok",
+    "cells": 17,
+    "errors": 0,
+    "calls": 3,
+    "input_tokens": 6196,
+    "output_tokens": 2510,
+    "seconds": 67,
+    "message": ""
+  },
+  "images": [],
+  "notes": {
+    "goal": "Build an autonomous customer service agent that plans actions by writing Python code rather than JSON, executing database queries and updates safely.",
+    "pattern": "Code as Action",
+    "diagram": {
+      "kind": "flow",
+      "title": "Customer Service Agent Workflow",
+      "nodes": [
+        {
+          "id": "setup",
+          "label": "Initialize Database",
+          "note": "Load inventory and transactions",
+          "group": ""
+        },
+        {
+          "id": "prompt",
+          "label": "Generate Plan in Code",
+          "note": "LLM writes Python with comments",
+          "group": ""
+        },
+        {
+          "id": "extract",
+          "label": "Extract Code Block",
+          "note": "Isolate execute_python tags",
+          "group": ""
+        },
+        {
+          "id": "sandbox",
+          "label": "Run in Sandbox",
+          "note": "Execute with TinyDB namespace",
+          "group": ""
+        },
+        {
+          "id": "result",
+          "label": "Display Results",
+          "note": "Show answer and table state",
+          "group": ""
+        }
+      ],
+      "edges": [
+        {
+          "source": "setup",
+          "target": "prompt",
+          "label": "schema ready"
+        },
+        {
+          "source": "prompt",
+          "target": "extract",
+          "label": "raw response"
+        },
+        {
+          "source": "extract",
+          "target": "sandbox",
+          "label": "python code"
+        },
+        {
+          "source": "sandbox",
+          "target": "result",
+          "label": "stdout and answer"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "title": "Set Up Database Tables",
+        "what_happens": "Initialize the TinyDB document store with seed data for sunglasses inventory and store transactions.",
+        "code_ref": "seed_db",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Query Read-Only Inventory",
+        "what_happens": "Ask the model to find round sunglasses under $100 by generating a Python plan that queries the inventory table.",
+        "code_ref": "generate_llm_code",
+        "call_refs": [
+          1
+        ],
+        "image": ""
+      },
+      {
+        "title": "Process a Return",
+        "what_happens": "Instruct the model to handle a return of 2 Aviator sunglasses, generating code that updates stock and logs a transaction.",
+        "code_ref": "generate_llm_code",
+        "call_refs": [
+          2
+        ],
+        "image": ""
+      },
+      {
+        "title": "Build Customer Service Agent",
+        "what_happens": "Combine code generation and sandboxed execution into an end-to-end agent function that processes multi-item purchases.",
+        "code_ref": "customer_service_agent",
+        "call_refs": [
+          3
+        ],
+        "image": ""
+      }
+    ],
+    "results": "The notebook ran successfully with zero cell errors and three model calls. The agent successfully generated Python plans, executed them within a safe namespace, accurately updated TinyDB inventory and transaction records, and returned concise customer-facing answers.",
+    "try_next": [
+      "Modify the prompt in cell 38 to purchase a quantity of sunglasses exceeding current stock to test the insufficient_stock failure branch.",
+      "Change the temperature parameter in generate_llm_code to see how it affects the style of comments and code produced by the model.",
+      "Add a new product category to the inventory initialization script and query it through the agent.",
+      "Write a custom query python snippet to inspect total revenue from the transactions table."
+    ]
+  }
+}

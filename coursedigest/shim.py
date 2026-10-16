@@ -7,6 +7,7 @@ builds (aisuite's included) talks to it. This module then:
 - runs OpenAI Responses calls as Chat Completions (the compatible endpoint speaks Chat Completions),
 - runs direct Anthropic Messages calls (text and images) on the same endpoint,
 - sends aisuite's other providers ("anthropic:...") through its OpenAI provider,
+- answers image generation with a labelled placeholder that shows the prompt (no free image model),
 and appends every call to $COURSEDIGEST_TRACE (JSON lines; input images saved under assets/).
 Runs inside the labs venv: standard library + openai + pydantic (+ anthropic, aisuite when installed).
 """
@@ -174,7 +175,7 @@ def describe(message: dict, assets: Path) -> str:
     return "\n".join(part for part in [text, *calls] if part)
 
 
-def record(api: str, requested: str, request: dict, completion, started: float, error: str = "") -> None:
+def record(api: str, requested: str, request: dict, completion, started: float, error: str = "", note: str = "") -> None:
     if not TRACE:
         return
     path = Path(TRACE)
@@ -188,7 +189,7 @@ def record(api: str, requested: str, request: dict, completion, started: float, 
         "messages": [{"role": m["role"], "content": describe(m, path.parent / "assets")}
                      for m in messages if m.get("role") != "system"],
         "tools": [as_dict(t).get("function", {}).get("name", "") for t in request.get("tools") or []],
-        "output": text, "tool_calls": [{"name": c["name"], "arguments": c["arguments"]} for c in calls],
+        "output": text or note, "tool_calls": [{"name": c["name"], "arguments": c["arguments"]} for c in calls],
         "usage": usage, "ms": int((time.time() - started) * 1000), "error": error,
     }
     with path.open("a", encoding="utf-8") as handle:
@@ -259,6 +260,38 @@ def anthropic_create(self, *args, **kwargs):
                                    stop_reason=stop, stop_sequence=None, usage=Usage.model_construct(**usage))
 
 
+def placeholder_png(prompt: str, size: str | None) -> str:
+    """A labelled card standing in for a generated image, showing the prompt the lab asked for."""
+    import io
+    import textwrap
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    width, height = (int(x) for x in size.split("x")) if size and "x" in size else (1024, 1024)
+    figure = plt.figure(figsize=(width / 160, height / 160), dpi=80)
+    figure.patch.set_facecolor("#f1e8fc")
+    figure.text(0.5, 0.9, "Image placeholder", ha="center", fontsize=18, weight="bold")
+    figure.text(0.5, 0.83, "No free image model: this is the prompt the agent wrote", ha="center", fontsize=10)
+    figure.text(0.07, 0.76, "\n".join(textwrap.wrap(prompt, 60)[:22]), va="top", fontsize=9, family="monospace")
+    buffer = io.BytesIO()
+    figure.savefig(buffer, format="png")
+    plt.close(figure)
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+def images_generate(self, *args, **kwargs):
+    from openai.types import Image, ImagesResponse
+
+    started = time.time()
+    prompt = kwargs.get("prompt", "")
+    data = placeholder_png(prompt, kwargs.get("size"))
+    record("openai.images", kwargs.get("model", ""), {"model": "placeholder", "messages": [{"role": "user", "content": prompt}]},
+           None, started, note="[placeholder image: no free image model]")
+    return ImagesResponse.model_construct(created=int(time.time()), data=[Image.model_construct(b64_json=data)])
+
+
 def aisuite_create(self, model: str, messages: list, **kwargs):
     provider, _, name = model.partition(":")
     if provider != "openai":
@@ -268,11 +301,13 @@ def aisuite_create(self, model: str, messages: list, **kwargs):
 
 def install() -> None:
     from openai.resources.chat.completions import Completions
+    from openai.resources.images import Images
     from openai.resources.responses import Responses
 
     _state["chat_create"] = Completions.create
     Completions.create = chat_create
     Responses.create = responses_create
+    Images.generate = images_generate
     try:
         from anthropic.resources.messages import Messages
         Messages.create = anthropic_create

@@ -1,0 +1,142 @@
+{
+  "slug": "536julvp0",
+  "title": "Ungraded Lab: Turning functions into tools",
+  "module": "Module 3 - Tool use",
+  "folder": "24-M3_UGL_1",
+  "run": {
+    "status": "ok",
+    "cells": 18,
+    "errors": 0,
+    "calls": 13,
+    "input_tokens": 3685,
+    "output_tokens": 442,
+    "seconds": 240,
+    "message": ""
+  },
+  "images": [
+    "cell38-9d1de2df.png"
+  ],
+  "notes": {
+    "goal": "This lab teaches you how to turn standard Python functions into tools that LLMs can automatically discover, parameterize, and execute via AISuite.",
+    "pattern": "tool use",
+    "diagram": {
+      "kind": "flow",
+      "title": "Turning Functions into Tools Workflow",
+      "nodes": [
+        {
+          "id": "setup",
+          "label": "Initialize AISuite Client",
+          "note": "Connect to the API",
+          "group": ""
+        },
+        {
+          "id": "define",
+          "label": "Define Python Functions",
+          "note": "Add clear docstrings",
+          "group": ""
+        },
+        {
+          "id": "bind",
+          "label": "Pass Tools to LLM",
+          "note": "Using aisuite with max_turns",
+          "group": ""
+        },
+        {
+          "id": "execute",
+          "label": "Automated Tool Execution",
+          "note": "LLM calls and parses results",
+          "group": ""
+        }
+      ],
+      "edges": [
+        {
+          "source": "setup",
+          "target": "define",
+          "label": "prepare"
+        },
+        {
+          "source": "define",
+          "target": "bind",
+          "label": "pass tools"
+        },
+        {
+          "source": "bind",
+          "target": "execute",
+          "label": "run prompt"
+        },
+        {
+          "source": "execute",
+          "target": "bind",
+          "label": "loop turns"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "title": "Environment Setup",
+        "what_happens": "Imports necessary libraries like json and loads environment variables to prepare for client initialization.",
+        "code_ref": "load_dotenv",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Initialize AISuite Client",
+        "what_happens": "Creates an AISuite client instance which acts as the unified interface for interacting with different LLM providers.",
+        "code_ref": "ai.Client",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Create First Tool",
+        "what_happens": "Defines a simple Python function with a clear docstring to fetch the current time, letting AISuite automatically convert it into an LLM tool.",
+        "code_ref": "get_current_time",
+        "call_refs": [
+          1,
+          2
+        ],
+        "image": ""
+      },
+      {
+        "title": "Manual Tool Schema",
+        "what_happens": "Demonstrates how tool schemas are structured behind the scenes with name, description, and parameters, and shows how to manually handle tool execution loops.",
+        "code_ref": "tools",
+        "call_refs": [
+          3,
+          4
+        ],
+        "image": ""
+      },
+      {
+        "title": "Add Advanced Tools",
+        "what_happens": "Defines multiple practical tools including a weather fetcher using IP lookups, a file writer, and a styled QR code generator.",
+        "code_ref": "get_weather_from_ip",
+        "call_refs": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "image": "cell38-9d1de2df.png"
+      },
+      {
+        "title": "Multi-Tool Orchestration",
+        "what_happens": "Asks the LLM a complex prompt requiring multiple tools in sequence, showing how the model correctly determines order of execution and parameters.",
+        "code_ref": "client.chat.completions.create",
+        "call_refs": [
+          11,
+          12,
+          13
+        ],
+        "image": ""
+      }
+    ],
+    "results": "The code ran successfully without any errors. All tool calls were handled correctly by the LLM, returning precise weather data, writing reminder files, and generating custom QR codes with embedded images.",
+    "try_next": [
+      "Write a new custom math or calculator function, add a docstring, and pass it as a tool to the LLM.",
+      "Modify the QR code tool to accept custom colors or change the error correction level.",
+      "Create a multi-step prompt that chains together the weather tool and file writer to log daily forecasts automatically."
+    ]
+  }
+}

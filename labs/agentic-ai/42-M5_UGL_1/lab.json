@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "index": 42,
+    "slug": "9inumthkb",
+    "name": "Ungraded Lab: Customer Service Agent",
+    "type": "notebook",
+    "seconds": 900,
+    "module": "Module 5 - Patterns for Highly Autonomous Agents"
+  },
+  "notebook": "M5_UGL_1_R.ipynb",
+  "source_dir": "M5/ungraded_labs/M5_UGL_1"
+}

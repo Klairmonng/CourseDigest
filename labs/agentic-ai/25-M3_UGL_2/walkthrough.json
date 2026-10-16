@@ -1,0 +1,145 @@
+{
+  "slug": "shknqak",
+  "title": "Ungraded Lab: Email Assistant Workflow",
+  "module": "Module 3 - Tool use",
+  "folder": "25-M3_UGL_2",
+  "run": {
+    "status": "ok",
+    "cells": 10,
+    "errors": 0,
+    "calls": 12,
+    "input_tokens": 7906,
+    "output_tokens": 339,
+    "seconds": 222,
+    "message": ""
+  },
+  "images": [],
+  "notes": {
+    "goal": "Build an email assistant agent using AISuite that can process natural language instructions and orchestrate multiple tools to manage a simulated inbox.",
+    "pattern": "Tool use",
+    "diagram": {
+      "kind": "flow",
+      "title": "Email Assistant Workflow",
+      "nodes": [
+        {
+          "id": "prompt",
+          "label": "User Request",
+          "note": "Natural language instruction",
+          "group": ""
+        },
+        {
+          "id": "llm",
+          "label": "LLM Agent",
+          "note": "Selects and calls tools",
+          "group": ""
+        },
+        {
+          "id": "tools",
+          "label": "Email Tools",
+          "note": "Python wrappers for API endpoints",
+          "group": ""
+        },
+        {
+          "id": "backend",
+          "label": "Simulated Backend",
+          "note": "FastAPI and SQLite inbox",
+          "group": ""
+        }
+      ],
+      "edges": [
+        {
+          "source": "prompt",
+          "target": "llm",
+          "label": "wraps in prompt"
+        },
+        {
+          "source": "llm",
+          "target": "tools",
+          "label": "calls tool"
+        },
+        {
+          "source": "tools",
+          "target": "backend",
+          "label": "executes action"
+        },
+        {
+          "source": "backend",
+          "target": "llm",
+          "label": "returns result"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "title": "Initialize Environment and Client",
+        "what_happens": "Loads environment variables and initializes the AISuite client to connect with language models.",
+        "code_ref": "client = ai.Client()",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Test Simulated Email Service",
+        "what_happens": "Runs quick wrapper functions to confirm the backend API endpoints for sending, reading, and deleting emails work correctly.",
+        "code_ref": "utils.test_send_email()",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Test Email Tool Layer",
+        "what_happens": "Exercises Python functions that wrap the API routes, ensuring the tool layer can successfully interact with the inbox.",
+        "code_ref": "email_tools.send_email()",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Prepare Agent Prompt",
+        "what_happens": "Defines a helper function to wrap user requests in system instructions that give the agent its persona and tool permissions.",
+        "code_ref": "build_prompt()",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Run Multi-Step Email Workflow",
+        "what_happens": "Instructs the agent to check unread emails from the boss, mark them as read, and send a polite follow-up automatically.",
+        "code_ref": "client.chat.completions.create()",
+        "call_refs": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "image": ""
+      },
+      {
+        "title": "Handle Missing Tools",
+        "what_happens": "Demonstrates that an agent cannot execute a task if the required tool is omitted from its available tool set.",
+        "code_ref": "client.chat.completions.create()",
+        "call_refs": [
+          5,
+          6
+        ],
+        "image": ""
+      },
+      {
+        "title": "Execute Targeted Actions with Delete Tool",
+        "what_happens": "Adds the delete tool to the agent's toolkit so it can successfully locate and delete specific emails like the Happy Hour message.",
+        "code_ref": "client.chat.completions.create()",
+        "call_refs": [
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "image": ""
+      }
+    ],
+    "results": "The lab ran successfully with zero cell errors. The LLM agent correctly chained multi-step tool calls to search for emails, mark them as read, send replies, and delete messages based entirely on natural language prompts.",
+    "try_next": [
+      "Write a new tool function that filters emails by a custom date range and register it with the agent.",
+      "Change the user prompt to ask the agent to search for and summarize all emails from a specific sender.",
+      "Remove the send_email tool from the tool list and observe how the agent handles a request that requires replying."
+    ]
+  }
+}

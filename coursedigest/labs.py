@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -114,6 +115,22 @@ def save_images(notebook, outputs: Path) -> list[str]:
     return names
 
 
+def save_written_images(lab_dir: Path, since: float, names: list[str]) -> list[str]:
+    """Add image files the run wrote into the lab folder (shown by path, not inline), skipping ones already saved."""
+    seen = {name.rsplit("-", 1)[-1].split(".")[0] for name in names}
+    added = []
+    for path in sorted(lab_dir.glob("*")):
+        if path.suffix.lower() in (".png", ".jpg", ".jpeg") and path.stat().st_mtime >= since:
+            raw = path.read_bytes()
+            digest = hashlib.sha1(raw).hexdigest()[:8]
+            if digest not in seen:
+                name = f"file-{path.stem}-{digest}{path.suffix.lower()}"
+                (lab_dir / "outputs" / name).write_bytes(raw)
+                added.append(name)
+                seen.add(digest)
+    return names + added
+
+
 def cell_errors(notebook) -> list[str]:
     errors = []
     for index, cell in enumerate(notebook.cells):
@@ -149,6 +166,32 @@ def lab_prompt(info: LabInfo, notebook, images: list[str], errors: list[str], tr
             f"Model calls ({len(trace)}):\n" + "\n\n".join(calls))
 
 
+def start_services(python: Path, lab_dir: Path, env: dict) -> tuple[list[subprocess.Popen], dict]:
+    """Servers a lab expects to be running (the course platform starts them), from the lab's coursedigest.json:
+    {"services": [{"app": "email_server.email_service:app", "port": 8765}], "env": {"NAME": "value"}}."""
+    config_path = lab_dir / "coursedigest.json"
+    if not config_path.exists():
+        return [], {}
+    config = json.loads(config_path.read_text("utf-8"))
+    processes = []
+    for service in config.get("services", []):
+        processes.append(subprocess.Popen(
+            [str(python), "-m", "uvicorn", service["app"], "--host", "127.0.0.1", "--port", str(service["port"])],
+            cwd=lab_dir, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        wait_for_port(service["port"])
+    return processes, config.get("env", {})
+
+
+def wait_for_port(port: int, seconds: float = 30) -> None:
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        with socket.socket() as probe:
+            if probe.connect_ex(("127.0.0.1", port)) == 0:
+                return
+        time.sleep(0.5)
+    log.warning("service on port %d did not start within %.0fs", port, seconds)
+
+
 def run_lab(lab_dir: Path, python: Path, env: dict, llm: LLM, cache_dir: Path) -> LabWalkthrough:
     info = LabInfo.model_validate_json((lab_dir / "lab.json").read_text("utf-8"))
     trace_path = lab_dir / "trace.jsonl"
@@ -156,8 +199,13 @@ def run_lab(lab_dir: Path, python: Path, env: dict, llm: LLM, cache_dir: Path) -
     for previous in ("outputs", "assets"):  # images from an earlier run
         shutil.rmtree(lab_dir / previous, ignore_errors=True)
     started = time.time()
-    executed, message = execute(python, lab_dir, info.notebook,
-                                {**env, "COURSEDIGEST_TRACE": str(trace_path)})
+    services, service_env = start_services(python, lab_dir, env)
+    try:
+        executed, message = execute(python, lab_dir, info.notebook,
+                                    {**env, **service_env, "COURSEDIGEST_TRACE": str(trace_path)})
+    finally:
+        for process in services:
+            process.terminate()
     seconds = int(time.time() - started)
     if not executed.exists():
         run = LabRun(status="failed", cells=0, errors=0, calls=0, input_tokens=0, output_tokens=0,
@@ -165,7 +213,7 @@ def run_lab(lab_dir: Path, python: Path, env: dict, llm: LLM, cache_dir: Path) -
         return LabWalkthrough(slug=info.meta.slug, title=info.meta.name, module=info.meta.module,
                               folder=lab_dir.name, run=run, images=[])
     notebook = nbformat.read(executed, as_version=4)
-    images = save_images(notebook, lab_dir / "outputs")
+    images = save_written_images(lab_dir, started, save_images(notebook, lab_dir / "outputs"))
     errors = cell_errors(notebook)
     trace = read_trace(trace_path)
     run = LabRun(status="errors" if errors else "ok", cells=sum(c.cell_type == "code" for c in notebook.cells),
@@ -184,10 +232,11 @@ def run_lab(lab_dir: Path, python: Path, env: dict, llm: LLM, cache_dir: Path) -
     return walkthrough
 
 
-def run_labs(slug: str, root: Path, llm: LLM) -> list[LabWalkthrough]:
+def run_labs(slug: str, root: Path, llm: LLM, only: list[str] | None = None) -> list[LabWalkthrough]:
     labs_dir = root / "labs"
     course_dir = labs_dir / slug
-    lab_dirs = sorted(p.parent for p in course_dir.glob("*/lab.json"))
+    lab_dirs = sorted(p.parent for p in course_dir.glob("*/lab.json")
+                      if not only or any(p.parent.name.startswith(prefix) for prefix in only))
     if not lab_dirs:
         log.warning("no labs in %s - run fetch first", course_dir)
         return []

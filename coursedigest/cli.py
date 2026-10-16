@@ -25,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
                        ("site", "build the visual site"), ("all", "fetch, digest, labs and site")):
         command = commands.add_parser(name, help=text)
         command.add_argument("course", help="course URL or slug")
+        if name == "labs":
+            command.add_argument("--only", nargs="+", metavar="PREFIX", help="lab folders to run, e.g. 25 44")
     return parser
 
 
@@ -69,7 +71,7 @@ def run(args: argparse.Namespace, root: Path) -> int:
                   + (f"; not digested: {', '.join(failed)}" if failed else ""))
         if args.command in ("labs", "all"):
             from .labs import run_labs
-            for walkthrough in run_labs(slug, root, llm):
+            for walkthrough in run_labs(slug, root, llm, getattr(args, "only", None)):
                 print(f"Lab {walkthrough.title}: {walkthrough.run.status} "
                       f"({walkthrough.run.errors} cell errors, {walkthrough.run.calls} model calls)")
         print(f"Model usage this run: {llm.summary()}")

@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "index": 34,
+    "slug": "nae3i1ymg",
+    "name": "Ungraded Lab: Adding a component-level eval to the research workflow",
+    "type": "notebook",
+    "seconds": 900,
+    "module": "Module 4 - Practical Tips for Building Agentic AI"
+  },
+  "notebook": "M4_UGL_1.ipynb",
+  "source_dir": "M4/ungraded_labs/M4_UGL_1"
+}

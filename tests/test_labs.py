@@ -1,3 +1,5 @@
+import base64
+
 import nbformat
 
 from coursedigest import labs
@@ -26,6 +28,16 @@ def test_save_images_and_errors(tmp_path):
     assert labs.cell_errors(nb) == ["cell 3: KeyError: 'x'"]
 
 
+def test_images_written_to_disk_are_added_once(tmp_path):
+    names = labs.save_images(notebook(), tmp_path / "outputs")
+    (tmp_path / "generated_image.png").write_bytes(b"new picture")
+    (tmp_path / "same_as_cell.png").write_bytes(base64.b64decode(PNG))
+    all_names = labs.save_written_images(tmp_path, 0, names)
+    added = all_names[len(names):]
+    assert len(added) == 1 and added[0].startswith("file-generated_image-")
+    assert (tmp_path / "outputs" / added[0]).read_bytes() == b"new picture"
+
+
 def test_lab_prompt_lists_calls_and_errors():
     info = LabInfo(meta=LessonMeta(index=4, slug="bb2", name="Ungraded Lab: Try it", type="notebook", seconds=900,
                                    module="Module 2"), notebook="L1.ipynb", source_dir="M2/ungraded_labs/L1")
@@ -40,6 +52,18 @@ def test_startup_file_loads_the_shim(tmp_path):
     ipython = labs.startup_dir(tmp_path, tmp_path / "repo")
     text = (ipython / "profile_default" / "startup" / "00-coursedigest-shim.py").read_text("utf-8")
     assert "import coursedigest.shim" in text and "sys.path.append" in text
+
+
+def test_services_come_from_the_lab_config(tmp_path, monkeypatch):
+    assert labs.start_services(tmp_path / "python", tmp_path, {}) == ([], {})
+    (tmp_path / "coursedigest.json").write_text(
+        '{"services": [{"app": "srv:app", "port": 8765}], "env": {"API_URL": "http://127.0.0.1:8765"}}', "utf-8")
+    started = []
+    monkeypatch.setattr(labs.subprocess, "Popen", lambda command, **kw: started.append(command) or "proc")
+    monkeypatch.setattr(labs, "wait_for_port", lambda port: None)
+    processes, env = labs.start_services(tmp_path / "python", tmp_path, {})
+    assert processes == ["proc"] and env == {"API_URL": "http://127.0.0.1:8765"}
+    assert started[0][-5:] == ["srv:app", "--host", "127.0.0.1", "--port", "8765"]
 
 
 def test_clip():
