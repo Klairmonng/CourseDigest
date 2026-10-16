@@ -1,7 +1,8 @@
 """The one way the tool calls a model: the OpenAI SDK, pointed at Gemini's free tier by default.
 
 LLM_PROVIDER=gemini (default, free tier, key GEMINI_API_KEY) or openai (paid, key OPENAI_API_KEY).
-LLM_MODEL overrides the provider's model list. Answers are cached by input hash, so re-runs are free.
+LLM_MODEL overrides the provider's model list. On Gemini every model has its own daily free quota, so the list is
+every available Flash model (see free_models). Answers are cached by input hash, so re-runs are free.
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ PROVIDERS = {
 }
 MAX_WAITS = 8
 BUSY_WAIT = 20.0
+FLASH = re.compile(r"^(?:models/)?gemini-(?:(\d+(?:\.\d+)?)-)?flash(-lite)?(-latest)?$")
 RETRY_IN = re.compile(r"retry in ([\d.]+)s|retryDelay['\"]?: ?['\"](\d+)s", re.I)
 
 log = logging.getLogger(__name__)
@@ -56,6 +58,17 @@ def provider_settings(name: str | None = None) -> tuple[str, dict]:
     return name, settings
 
 
+def free_models(ids: list[str]) -> list[str]:
+    """Gemini text Flash models, best first: Flash before Flash-Lite, then the -latest alias, then newest version."""
+    ranked = []
+    for model_id in ids:
+        match = FLASH.match(model_id)
+        if match and (match.group(1) or match.group(3)):
+            version = float(match.group(1)) if match.group(1) else 99.0
+            ranked.append((match.group(2) is not None, -version, model_id.removeprefix("models/")))
+    return [model_id for *_, model_id in sorted(ranked)]
+
+
 def retry_seconds(error: Exception) -> float:
     match = RETRY_IN.search(str(error))
     return float(match.group(1) or match.group(2)) + 1 if match else 30.0
@@ -85,6 +98,9 @@ def call_with_quota(models: list[str], call):
                     spent.add(model)
                 else:
                     wait = max(wait, retry_seconds(exc))
+            except openai.NotFoundError:
+                log.info("%s is not available to this key, skipped", model)
+                spent.add(model)
             except (openai.InternalServerError, openai.APIConnectionError) as exc:
                 log.info("%s busy (%s)", model, type(exc).__name__)
                 wait = max(wait, BUSY_WAIT)
@@ -105,6 +121,11 @@ class LLM:
                 raise LLMError(f"{settings['key']} is not set in .env")
             client = openai.OpenAI(api_key=key, base_url=settings["base_url"], max_retries=1)
         self.client = client
+        if self.provider == "gemini" and not os.environ.get("LLM_MODEL"):
+            try:
+                self.models = free_models([m.id for m in client.models.list()]) or self.models
+            except openai.OpenAIError as exc:
+                log.warning("could not list models (%s); using %s", exc, ", ".join(self.models))
         self.base_url = settings["base_url"]
         self.api_key_name = settings["key"]
         self.usage = {"input": 0, "output": 0, "calls": 0}

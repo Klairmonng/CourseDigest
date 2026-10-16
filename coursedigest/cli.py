@@ -33,6 +33,8 @@ def main(argv: list[str] | None = None) -> int:
         stream.reconfigure(encoding="utf-8")
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    for noisy in ("httpx", "httpx2", "openai"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     root = args.root.resolve()
     load_dotenv(root / ".env")
     try:

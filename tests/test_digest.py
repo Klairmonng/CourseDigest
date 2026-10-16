@@ -56,7 +56,8 @@ class ExplodingClient:
         raise AssertionError("cached answers must not call the API")
 
 
-def test_structured_reads_cache_without_calling_the_api(tmp_path):
+def test_structured_reads_cache_without_calling_the_api(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "m")
     key = cache_key("m", "v", "prompt")
     (tmp_path / f"{key}.json").write_text(lesson_notes().model_dump_json(), "utf-8")
     llm = LLM(client=ExplodingClient(), provider="gemini")
@@ -99,6 +100,26 @@ def test_busy_model_passes_the_call_on(monkeypatch):
         return "ok"
 
     assert llm_module.call_with_quota(["a", "b"], call) == ("b", "ok") and calls == ["a", "b"]
+
+
+def test_free_models_ranks_flash_before_lite_and_skips_other_kinds():
+    ids = ["models/gemini-2.5-flash", "models/gemini-3.5-flash", "models/gemini-flash-latest", "models/gemini-3.5-flash-lite",
+           "models/gemini-flash-lite-latest", "models/gemini-3.1-flash-image", "models/gemini-3-flash-preview",
+           "models/gemini-pro-latest", "models/gemini-2.5-flash-preview-tts"]
+    assert llm_module.free_models(ids) == ["gemini-flash-latest", "gemini-3.5-flash", "gemini-2.5-flash",
+                                           "gemini-flash-lite-latest", "gemini-3.5-flash-lite"]
+
+
+def test_retired_model_is_skipped(monkeypatch):
+    gone = llm_module.openai.NotFoundError.__new__(llm_module.openai.NotFoundError)
+    Exception.__init__(gone, "404 no longer available")
+
+    def call(model):
+        if model == "old":
+            raise gone
+        return "ok"
+
+    assert llm_module.call_with_quota(["old", "new"], call) == ("new", "ok")
 
 
 def test_retry_seconds_reads_the_delay():
