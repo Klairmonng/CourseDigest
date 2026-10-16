@@ -127,7 +127,7 @@ def digest_course(slug: str, root: Path, llm: LLM) -> CourseDigest:
                                    cache_key(llm.model, PROMPT_VERSION, prompt))
         except Exception as exc:
             log.error("course synthesis failed: %s", exc)
-    digest = CourseDigest(course=course, notes=notes, lessons=digests, model=llm.model,
+    digest = CourseDigest(course=course, notes=notes, lessons=digests, model=llm.label(),
                           prompt_version=PROMPT_VERSION,
                           generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
     out = root / "digests" / f"{slug}.json"

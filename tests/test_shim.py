@@ -90,7 +90,18 @@ def test_aisuite_models_are_sent_through_the_openai_provider(monkeypatch):
     assert seen == ["openai:claude-x", "openai:gpt-4.1"]
 
 
-def test_retry_seconds_reads_the_delay():
-    assert shim.retry_seconds(RuntimeError("Please retry in 12.5s.")) == 13.5
-    assert shim.retry_seconds(RuntimeError("'retryDelay': '33s'")) == 34
-    assert shim.retry_seconds(RuntimeError("busy")) == 30.0
+def test_run_chat_traces_the_model_that_answered(tmp_path, monkeypatch):
+    monkeypatch.setattr(shim, "TRACE", str(tmp_path / "trace.jsonl"))
+    monkeypatch.setattr(shim, "MODELS", ["busy-model", "free-model"])
+    openai = pytest.importorskip("openai")
+    busy = openai.InternalServerError.__new__(openai.InternalServerError)
+    Exception.__init__(busy, "503 high demand")
+
+    def create(**request):
+        if request["model"] == "busy-model":
+            raise busy
+        return completion("answer")
+
+    result = shim.run_chat("openai.chat", "gpt-4.1", {"model": "x", "messages": []}, create)
+    entry = json.loads((tmp_path / "trace.jsonl").read_text("utf-8"))
+    assert result.choices[0].message.content == "answer" and entry["model"] == "free-model"

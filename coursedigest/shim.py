@@ -2,12 +2,13 @@
 
 labs.py points the OpenAI SDK at the provider through OPENAI_BASE_URL / OPENAI_API_KEY, so every OpenAI client the lab
 builds (aisuite's included) talks to it. This module then:
-- rewrites the requested model (gpt-4.1, o4-mini, ...) to $COURSEDIGEST_MODEL and waits out per-minute rate limits,
+- rewrites the requested model (gpt-4.1, o4-mini, ...) to the first of $COURSEDIGEST_MODELS that answers
+  (busy or rate-limited models pass the call on, see llm.call_with_quota),
 - runs OpenAI Responses calls as Chat Completions (the compatible endpoint speaks Chat Completions),
 - runs direct Anthropic Messages calls (text and images) on the same endpoint,
 - sends aisuite's other providers ("anthropic:...") through its OpenAI provider,
 and appends every call to $COURSEDIGEST_TRACE (JSON lines; input images saved under assets/).
-Runs inside the labs venv: standard library + openai (+ anthropic, aisuite when installed).
+Runs inside the labs venv: standard library + openai + pydantic (+ anthropic, aisuite when installed).
 """
 from __future__ import annotations
 
@@ -15,16 +16,14 @@ import base64
 import hashlib
 import json
 import os
-import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODEL = os.environ.get("COURSEDIGEST_MODEL", "gemini-flash-latest")
+MODELS = [m for m in os.environ.get("COURSEDIGEST_MODELS", "gemini-flash-latest").split(",") if m]
+MODEL = MODELS[0]
 TRACE = os.environ.get("COURSEDIGEST_TRACE", "")
 MIN_MAX_TOKENS = 8192  # thinking models spend part of the token budget before answering
-MAX_WAITS = 8
-RETRY_IN = re.compile(r"retry in ([\d.]+)s|retryDelay['\"]?: ?['\"](\d+)s", re.I)
 
 _state: dict = {"count": 0, "chat_create": None, "aisuite_create": None, "client": None}
 
@@ -198,40 +197,24 @@ def record(api: str, requested: str, request: dict, completion, started: float, 
 
 # --- patches -----------------------------------------------------------------------------------
 
-def retry_seconds(error: Exception) -> float:
-    match = RETRY_IN.search(str(error))
-    return float(match.group(1) or match.group(2)) + 1 if match else 30.0
+def run_chat(api: str, requested: str, request: dict, create, *args):
+    """create(*args, **request) on the first model that answers; every attempt that ends the call is traced."""
+    from .llm import call_with_quota
 
-
-def with_waits(call):
-    import openai
-
-    for _ in range(MAX_WAITS):
-        try:
-            return call()
-        except openai.RateLimitError as exc:
-            if "PerDay" in str(exc):
-                raise
-            time.sleep(retry_seconds(exc))
-    return call()
-
-
-def run_chat(api: str, requested: str, request: dict, call):
     started = time.time()
     try:
-        completion = with_waits(call)
+        model, completion = call_with_quota(MODELS, lambda m: create(*args, **dict(request, model=m)))
     except Exception as exc:
         record(api, requested, request, None, started, str(exc))
         raise
     if not request.get("stream"):
-        record(api, requested, request, completion, started)
+        record(api, requested, dict(request, model=model), completion, started)
     return completion
 
 
 def chat_create(self, *args, **kwargs):
     request = chat_request(kwargs)
-    return run_chat("openai.chat", kwargs.get("model", ""), request,
-                    lambda: _state["chat_create"](self, *args, **request))
+    return run_chat("openai.chat", kwargs.get("model", ""), request, _state["chat_create"], self, *args)
 
 
 def responses_create(self, *args, **kwargs):
@@ -241,8 +224,7 @@ def responses_create(self, *args, **kwargs):
         raise NotImplementedError("coursedigest shim: streaming Responses calls are not supported")
     request = responses_to_chat(kwargs)
     chat = self._client.chat.completions
-    completion = run_chat("openai.responses", kwargs.get("model", ""), request,
-                          lambda: _state["chat_create"](chat, **request))
+    completion = run_chat("openai.responses", kwargs.get("model", ""), request, _state["chat_create"], chat)
     text, calls, _ = reply_parts(completion)
     output = [ResponseOutputMessage.model_construct(
         id=f"msg_{completion.id}", type="message", role="assistant", status="completed",
@@ -269,8 +251,7 @@ def anthropic_create(self, *args, **kwargs):
         raise NotImplementedError("coursedigest shim: Anthropic streaming and tool use are not supported")
     request = anthropic_to_chat(kwargs)
     chat = openai_client().chat.completions
-    completion = run_chat("anthropic.messages", kwargs.get("model", ""), request,
-                          lambda: _state["chat_create"](chat, **request))
+    completion = run_chat("anthropic.messages", kwargs.get("model", ""), request, _state["chat_create"], chat)
     text, _, usage = reply_parts(completion)
     stop = "max_tokens" if completion.choices[0].finish_reason == "length" else "end_turn"
     return Message.model_construct(id=completion.id, type="message", role="assistant", model=MODEL,

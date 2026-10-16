@@ -191,7 +191,7 @@ def run_labs(slug: str, root: Path, llm: LLM) -> list[LabWalkthrough]:
     requirements = course_dir / "requirements.txt"
     python = ensure_venv(labs_dir, requirements if requirements.exists() else None)
     env = {**os.environ, "IPYTHONDIR": str(startup_dir(labs_dir, Path(__file__).resolve().parent.parent)),
-           "COURSEDIGEST_MODEL": llm.model, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8",
+           "COURSEDIGEST_MODELS": ",".join(llm.models), "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8",
            # every OpenAI client the lab builds talks to the configured provider
            "OPENAI_API_KEY": os.environ[llm.api_key_name]}
     if llm.base_url:

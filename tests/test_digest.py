@@ -73,7 +73,8 @@ def rate_limit(message):
 def test_quota_waits_per_minute_and_moves_on_after_a_daily_limit(monkeypatch):
     waits = []
     monkeypatch.setattr(llm_module.time, "sleep", waits.append)
-    outcomes = {"a": [rate_limit("Please retry in 2s. PerMinute"), rate_limit("quota PerDay exceeded")], "b": ["done"]}
+    outcomes = {"a": [rate_limit("Please retry in 2s. PerMinute"), rate_limit("quota PerDay exceeded")],
+                "b": [rate_limit("Please retry in 1s. PerMinute"), "done"]}
 
     def call(model):
         outcome = outcomes[model].pop(0)
@@ -83,6 +84,27 @@ def test_quota_waits_per_minute_and_moves_on_after_a_daily_limit(monkeypatch):
 
     assert llm_module.call_with_quota(["a", "b"], call) == ("b", "done")
     assert waits == [3.0]
+
+
+def test_busy_model_passes_the_call_on(monkeypatch):
+    monkeypatch.setattr(llm_module.time, "sleep", lambda s: None)
+    busy = llm_module.openai.InternalServerError.__new__(llm_module.openai.InternalServerError)
+    Exception.__init__(busy, "503 high demand")
+    calls = []
+
+    def call(model):
+        calls.append(model)
+        if model == "a":
+            raise busy
+        return "ok"
+
+    assert llm_module.call_with_quota(["a", "b"], call) == ("b", "ok") and calls == ["a", "b"]
+
+
+def test_retry_seconds_reads_the_delay():
+    assert llm_module.retry_seconds(RuntimeError("Please retry in 12.5s.")) == 13.5
+    assert llm_module.retry_seconds(RuntimeError("'retryDelay': '33s'")) == 34
+    assert llm_module.retry_seconds(RuntimeError("busy")) == 30.0
 
 
 def test_quota_gives_up_when_every_model_is_spent(monkeypatch):

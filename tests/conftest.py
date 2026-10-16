@@ -93,3 +93,6 @@ class FakeLLM:
         if output is CourseNotes:
             return course_notes()
         raise AssertionError(output)
+
+    def label(self) -> str:
+        return self.model

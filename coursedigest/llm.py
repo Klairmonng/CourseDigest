@@ -23,6 +23,7 @@ PROVIDERS = {
     "openai": {"base_url": None, "key": "OPENAI_API_KEY", "models": ["gpt-4.1-mini"]},
 }
 MAX_WAITS = 8
+BUSY_WAIT = 20.0
 RETRY_IN = re.compile(r"retry in ([\d.]+)s|retryDelay['\"]?: ?['\"](\d+)s", re.I)
 
 log = logging.getLogger(__name__)
@@ -65,21 +66,33 @@ def is_daily_quota(error: Exception) -> bool:
 
 
 def call_with_quota(models: list[str], call):
-    """Run call(model); wait out per-minute limits; move to the next model when a daily quota is spent."""
-    for model in models:
-        for _ in range(MAX_WAITS):
+    """Run call(model) on the first model that answers.
+
+    A busy (5xx) or per-minute-limited model passes the call to the next one; when every model is busy, wait and go
+    round again. A model whose daily quota is spent is dropped for the rest of the run.
+    """
+    spent: set[str] = set()
+    for _ in range(MAX_WAITS):
+        wait = 0.0
+        for model in models:
+            if model in spent:
+                continue
             try:
                 return model, call(model)
             except openai.RateLimitError as exc:
                 if is_daily_quota(exc):
                     log.warning("daily free-tier quota used up for %s", model)
-                    break
-                wait = retry_seconds(exc)
-                log.info("rate limited on %s, waiting %.0fs", model, wait)
-                time.sleep(wait)
-        else:
-            raise LLMError(f"still rate limited on {model} after {MAX_WAITS} waits")
-    raise DailyQuota("daily free-tier quota used up for every model; run again tomorrow (finished items are kept)")
+                    spent.add(model)
+                else:
+                    wait = max(wait, retry_seconds(exc))
+            except (openai.InternalServerError, openai.APIConnectionError) as exc:
+                log.info("%s busy (%s)", model, type(exc).__name__)
+                wait = max(wait, BUSY_WAIT)
+        if len(spent) == len(models):
+            raise DailyQuota("daily free-tier quota used up for every model; run again tomorrow (finished items are kept)")
+        log.info("all models busy or rate limited, waiting %.0fs", wait)
+        time.sleep(wait)
+    raise LLMError(f"models still busy after {MAX_WAITS} rounds: {', '.join(models)}")
 
 
 class LLM:
@@ -90,11 +103,12 @@ class LLM:
             key = os.environ.get(settings["key"])
             if not key:
                 raise LLMError(f"{settings['key']} is not set in .env")
-            client = openai.OpenAI(api_key=key, base_url=settings["base_url"])
+            client = openai.OpenAI(api_key=key, base_url=settings["base_url"], max_retries=1)
         self.client = client
         self.base_url = settings["base_url"]
         self.api_key_name = settings["key"]
         self.usage = {"input": 0, "output": 0, "calls": 0}
+        self.answered: dict[str, int] = {}
         self._lock = threading.Lock()
 
     @property
@@ -111,6 +125,7 @@ class LLM:
             model=m, messages=messages, response_format=output))
         with self._lock:
             self.usage["calls"] += 1
+            self.answered[model] = self.answered.get(model, 0) + 1
             if response.usage:
                 self.usage["input"] += response.usage.prompt_tokens
                 self.usage["output"] += response.usage.completion_tokens
@@ -125,6 +140,10 @@ class LLM:
         path.write_text(message.parsed.model_dump_json(indent=2), "utf-8")
         return message.parsed
 
+    def label(self) -> str:
+        """The models that answered this run, most used first (the configured model when nothing was called)."""
+        return ", ".join(sorted(self.answered, key=self.answered.get, reverse=True)) or self.model
+
     def summary(self) -> str:
         return (f"{self.usage['calls']} calls, {self.usage['input']:,} input / {self.usage['output']:,} output tokens "
-                f"on {self.provider} ({self.model})" + (" - free tier" if self.provider == "gemini" else ""))
+                f"on {self.provider} ({self.label()})" + (" - free tier" if self.provider == "gemini" else ""))
