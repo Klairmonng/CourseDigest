@@ -1,4 +1,4 @@
-"""Claude digest per lesson plus one course-level synthesis -> digests/<course>.json."""
+"""Model digest per lesson plus one course-level synthesis -> digests/<course>.json."""
 from __future__ import annotations
 
 import logging
@@ -6,11 +6,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .claude import Claude, cache_key
+from .llm import LLM, cache_key
 from .models import TEXT_TYPES, CourseDigest, CourseMap, CourseNotes, LessonContent, LessonDigest, LessonNotes
 
 PROMPT_VERSION = "lesson-v1"
-WORKERS = 4
+WORKERS = 2  # free-tier per-minute limits
 log = logging.getLogger(__name__)
 
 DIAGRAM_RULES = """\
@@ -94,7 +94,7 @@ def load_lessons(cache: Path) -> list[LessonContent]:
     return [c for c in contents if c.meta.type in TEXT_TYPES]
 
 
-def digest_lesson(claude: Claude, course: CourseMap, content: LessonContent, cache_dir: Path) -> LessonDigest:
+def digest_lesson(llm: LLM, course: CourseMap, content: LessonContent, cache_dir: Path) -> LessonDigest:
     meta = content.meta
     base = dict(slug=meta.slug, title=meta.name, module=meta.module,
                 kind="video" if meta.type == "video" else "reading",
@@ -103,8 +103,8 @@ def digest_lesson(claude: Claude, course: CourseMap, content: LessonContent, cac
         return LessonDigest(**base, status="no_transcript")
     prompt = lesson_prompt(course, content)
     try:
-        notes = claude.structured(LESSON_SYSTEM, prompt, LessonNotes, cache_dir,
-                                  cache_key(claude.model, PROMPT_VERSION, prompt))
+        notes = llm.structured(LESSON_SYSTEM, prompt, LessonNotes, cache_dir,
+                               cache_key(llm.model, PROMPT_VERSION, prompt))
     except Exception as exc:  # one lesson failing must not stop the course
         log.error("lesson %s failed: %s", meta.name, exc)
         return LessonDigest(**base, status="failed", error=str(exc))
@@ -112,22 +112,22 @@ def digest_lesson(claude: Claude, course: CourseMap, content: LessonContent, cac
     return LessonDigest(**base, status="ok", notes=clamp_watch(notes, content))
 
 
-def digest_course(slug: str, root: Path, claude: Claude) -> CourseDigest:
+def digest_course(slug: str, root: Path, llm: LLM) -> CourseDigest:
     cache = root / "cache" / slug
     course = CourseMap.model_validate_json((cache / "course.json").read_text("utf-8"))
     contents = load_lessons(cache)
-    cache_dir = cache / "claude"
+    cache_dir = cache / "llm"
     with ThreadPoolExecutor(WORKERS) as pool:
-        digests = list(pool.map(lambda c: digest_lesson(claude, course, c, cache_dir), contents))
+        digests = list(pool.map(lambda c: digest_lesson(llm, course, c, cache_dir), contents))
     notes = None
     if any(d.notes for d in digests):
         prompt = course_prompt(course, digests)
         try:
-            notes = claude.structured(COURSE_SYSTEM, prompt, CourseNotes, cache_dir,
-                                      cache_key(claude.model, PROMPT_VERSION, prompt), effort="high")
+            notes = llm.structured(COURSE_SYSTEM, prompt, CourseNotes, cache_dir,
+                                   cache_key(llm.model, PROMPT_VERSION, prompt))
         except Exception as exc:
             log.error("course synthesis failed: %s", exc)
-    digest = CourseDigest(course=course, notes=notes, lessons=digests, model=claude.model,
+    digest = CourseDigest(course=course, notes=notes, lessons=digests, model=llm.model,
                           prompt_version=PROMPT_VERSION,
                           generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
     out = root / "digests" / f"{slug}.json"

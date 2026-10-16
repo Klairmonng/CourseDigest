@@ -215,7 +215,7 @@ d="M0,0 L10,5 L0,10 z"/></marker></defs></svg>
 {% if labs %}
 <section id="labs">
   <h2>Labs</h2>
-  <p class="muted">Each ungraded lab was run end to end with Claude answering the model calls. The numbered calls are the real requests the lab made.</p>
+  <p class="muted">Each ungraded lab was run end to end; {{ digest.model }} answered the model calls the lab makes. The numbered calls are the real requests from our run.</p>
   {% for w, trace in labs %}{% set n = w.notes %}
   <article class="card lab" id="lab-{{ w.slug }}" data-folder="{{ w.folder }}">
     <div class="meta"><span class="badge lab">Lab</span><span>{{ w.module }}</span>

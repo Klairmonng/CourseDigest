@@ -1,6 +1,6 @@
 # ADR-002: Run labs unmodified with a kernel-startup shim that routes model calls to Claude
 
-**Status:** Accepted · **Date:** 2026-10-16 · **Feature:** coursedigest-v1 · **Author:** 10x-Team (Architect + Staff Engineer)
+**Status:** Accepted (target model superseded by ADR-005) · **Date:** 2026-10-16 · **Feature:** coursedigest-v1 · **Author:** 10x-Team (Architect + Staff Engineer)
 
 ## Context
 The user has Anthropic and Tavily keys, not OpenAI. Labs call models three ways: `openai.OpenAI().responses.create` (text + images), `aisuite.Client().chat.completions.create(model="openai:...")`, and `anthropic.Anthropic().messages.create(temperature=0)` - and `temperature` is rejected by `claude-opus-5-5`. The labs must run end to end and be shown visually.

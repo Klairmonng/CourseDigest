@@ -5,83 +5,92 @@ import pytest
 from coursedigest import shim
 
 PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+DATA_URL = f"data:image/png;base64,{PNG}"
 
 
-def test_chat_translation_merges_roles_and_drops_sampling():
-    kwargs = {
-        "model": "gpt-4.1", "temperature": 0, "max_tokens": 300, "response_format": {"type": "json_object"},
-        "messages": [
-            {"role": "system", "content": "Be brief."},
-            {"role": "user", "content": [{"type": "text", "text": "Look"},
-                                         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{PNG}"}}]},
-            {"role": "assistant", "content": None, "tool_calls": [
-                {"id": "call_1", "type": "function", "function": {"name": "search", "arguments": '{"q": "x"}'}},
-                {"id": "call_2", "type": "function", "function": {"name": "search", "arguments": '{"q": "y"}'}}]},
-            {"role": "tool", "tool_call_id": "call_1", "content": "r1"},
-            {"role": "tool", "tool_call_id": "call_2", "content": "r2"},
-        ],
-        "tools": [{"type": "function", "function": {"name": "search", "description": "Search",
-                                                    "parameters": {"type": "object", "properties": {"q": {"type": "string"}}}}}],
-    }
-    request = shim.chat_to_anthropic(kwargs, {})
-    assert request["model"] == shim.MODEL and "temperature" not in request
-    assert request["max_tokens"] == shim.MIN_MAX_TOKENS
-    assert request["system"].startswith("Be brief.") and shim.JSON_INSTRUCTION in request["system"]
-    assert [m["role"] for m in request["messages"]] == ["user", "assistant", "user"]
-    assert request["messages"][0]["content"][1]["source"] == {"type": "base64", "media_type": "image/png", "data": PNG}
-    assert [b["input"] for b in request["messages"][1]["content"]] == [{"q": "x"}, {"q": "y"}]
-    assert [b["tool_use_id"] for b in request["messages"][2]["content"]] == ["call_1", "call_2"]
-    assert request["tools"][0]["input_schema"]["properties"]["q"]["type"] == "string"
-
-
-def test_assistant_turn_reuses_original_claude_blocks():
-    original = [{"type": "thinking", "thinking": "", "signature": "sig"},
-                {"type": "tool_use", "id": "toolu_1", "name": "f", "input": {}}]
-    request = shim.chat_to_anthropic({"messages": [
-        {"role": "user", "content": "hi"},
-        {"role": "assistant", "content": None, "tool_calls": [{"id": "toolu_1", "type": "function",
-                                                               "function": {"name": "f", "arguments": "{}"}}]},
-        {"role": "tool", "tool_call_id": "toolu_1", "content": "done"}]}, {"toolu_1": original})
-    assert request["messages"][1]["content"] == original
-
-
-def test_responses_translation():
-    request = shim.responses_to_anthropic({
-        "model": "o4-mini", "instructions": "Judge charts.", "max_output_tokens": 50000,
-        "input": [{"role": "user", "content": [{"type": "input_text", "text": "Rate this"},
-                                               {"type": "input_image", "image_url": f"data:image/png;base64,{PNG}"}]}]}, {})
-    assert request["system"] == "Judge charts." and request["max_tokens"] == 50000
-    assert [b["type"] for b in request["messages"][0]["content"]] == ["text", "image"]
-    assert shim.responses_to_anthropic({"input": "Hello"}, {})["messages"] == [
-        {"role": "user", "content": [{"type": "text", "text": "Hello"}]}]
-
-
-def test_anthropic_request_forces_model_and_drops_unsupported():
-    request = shim.anthropic_request({"model": "claude-3-haiku", "temperature": 0, "max_tokens": 10,
-                                      "thinking": {"type": "disabled"}, "messages": []})
-    assert request == {"model": shim.MODEL, "max_tokens": shim.MIN_MAX_TOKENS, "messages": []}
-
-
-def test_chat_completion_shape_validates_with_openai():
+def completion(content="ok", tool_calls=None, finish="stop"):
     openai = pytest.importorskip("openai")
-    message = {"id": "msg_1", "model": shim.MODEL, "stop_reason": "tool_use", "usage": {"input_tokens": 5, "output_tokens": 7},
-               "content": [{"type": "thinking", "thinking": ""}, {"type": "text", "text": "Let me search."},
-                           {"type": "tool_use", "id": "toolu_9", "name": "search", "input": {"q": "x"}}]}
-    completion = openai.types.chat.ChatCompletion.model_validate(shim.chat_completion(message))
-    choice = completion.choices[0]
-    assert choice.finish_reason == "tool_calls" and choice.message.content == "Let me search."
-    assert json.loads(choice.message.tool_calls[0].function.arguments) == {"q": "x"}
-    assert completion.usage.total_tokens == 12
+    return openai.types.chat.ChatCompletion.model_validate({
+        "id": "c1", "object": "chat.completion", "created": 0, "model": shim.MODEL,
+        "choices": [{"index": 0, "finish_reason": finish,
+                     "message": {"role": "assistant", "content": content, "tool_calls": tool_calls}}],
+        "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}})
+
+
+def test_chat_request_rewrites_model_and_raises_small_token_limits():
+    request = shim.chat_request({"model": "gpt-4.1", "temperature": 0, "max_tokens": 300, "messages": []})
+    assert request["model"] == shim.MODEL and request["max_tokens"] == shim.MIN_MAX_TOKENS
+    assert request["temperature"] == 0  # supported by the compatible endpoint, kept
+    assert "max_tokens" not in shim.chat_request({"model": "o4-mini", "messages": []})
+
+
+def test_responses_translation_with_images_tools_and_tool_results():
+    request = shim.responses_to_chat({
+        "model": "o4-mini", "instructions": "Judge charts.", "max_output_tokens": 50000,
+        "input": [
+            {"role": "user", "content": [{"type": "input_text", "text": "Rate this"},
+                                         {"type": "input_image", "image_url": DATA_URL}]},
+            {"type": "function_call", "call_id": "fc1", "name": "lookup", "arguments": '{"q": "x"}'},
+            {"type": "function_call", "call_id": "fc2", "name": "lookup", "arguments": '{"q": "y"}'},
+            {"type": "function_call_output", "call_id": "fc1", "output": "r1"},
+        ],
+        "tools": [{"type": "function", "name": "lookup", "parameters": {"type": "object", "properties": {}}}],
+        "text": {"format": {"type": "json_object"}},
+    })
+    roles = [m["role"] for m in request["messages"]]
+    assert roles == ["system", "user", "assistant", "tool"]
+    assert request["messages"][1]["content"][1] == {"type": "image_url", "image_url": {"url": DATA_URL}}
+    assert [c["id"] for c in request["messages"][2]["tool_calls"]] == ["fc1", "fc2"]
+    assert request["max_tokens"] == 50000 and request["tools"][0]["function"]["name"] == "lookup"
+    assert request["response_format"] == {"type": "json_object"}
+    assert shim.responses_to_chat({"input": "Hello"})["messages"] == [{"role": "user", "content": "Hello"}]
+
+
+def test_anthropic_translation():
+    request = shim.anthropic_to_chat({"model": "claude-x", "system": "Be brief.", "max_tokens": 100, "temperature": 0,
+                                      "messages": [{"role": "user", "content": [
+                                          {"type": "text", "text": "What is this?"},
+                                          {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": PNG}}]}]})
+    assert request["messages"][0] == {"role": "system", "content": "Be brief."}
+    assert request["messages"][1]["content"][1]["image_url"]["url"] == DATA_URL
+    assert request["max_tokens"] == shim.MIN_MAX_TOKENS and request["model"] == shim.MODEL
+    with pytest.raises(NotImplementedError):
+        shim.anthropic_to_chat({"messages": [{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t"}]}]})
+
+
+def test_reply_parts_reads_text_tool_calls_and_usage():
+    calls = [{"id": "t1", "type": "function", "function": {"name": "search", "arguments": '{"q": "x"}'}}]
+    text, parsed, usage = shim.reply_parts(completion("Let me search.", calls, "tool_calls"))
+    assert text == "Let me search." and parsed[0]["name"] == "search" and json.loads(parsed[0]["arguments"]) == {"q": "x"}
+    assert usage == {"input_tokens": 5, "output_tokens": 7}
 
 
 def test_record_writes_trace_and_saves_images(tmp_path, monkeypatch):
     trace = tmp_path / "trace.jsonl"
     monkeypatch.setattr(shim, "TRACE", str(trace))
-    request = {"system": "s", "messages": [{"role": "user", "content": [
-        {"type": "text", "text": "see"}, {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": PNG}}]}]}
-    message = {"model": shim.MODEL, "content": [{"type": "text", "text": "ok"}], "usage": {"input_tokens": 3, "output_tokens": 1}}
-    shim.record("openai.chat", "gpt-4.1", request, message, started=0)
+    request = {"model": shim.MODEL, "messages": [
+        {"role": "system", "content": "s"},
+        {"role": "user", "content": [{"type": "text", "text": "see"}, {"type": "image_url", "image_url": {"url": DATA_URL}}]},
+        {"role": "assistant", "content": None, "tool_calls": [{"id": "t", "type": "function", "function": {"name": "f", "arguments": "{}"}}]},
+        {"role": "tool", "tool_call_id": "t", "content": "42"}]}
+    shim.record("openai.chat", "gpt-4.1", request, completion("ok"), started=0)
     entry = json.loads(trace.read_text("utf-8"))
-    assert entry["requested_model"] == "gpt-4.1" and entry["output"] == "ok" and entry["usage"]["input_tokens"] == 3
+    assert entry["requested_model"] == "gpt-4.1" and entry["output"] == "ok" and entry["usage"]["input_tokens"] == 5
+    assert entry["system"] == "s" and [m["role"] for m in entry["messages"]] == ["user", "assistant", "tool"]
     image = entry["messages"][0]["content"].split("[image: ")[1].rstrip("]")
     assert (tmp_path / image).exists()
+    assert entry["messages"][1]["content"] == "[calls f({})]" and entry["messages"][2]["content"] == "[tool result: 42]"
+
+
+def test_aisuite_models_are_sent_through_the_openai_provider(monkeypatch):
+    seen = []
+    monkeypatch.setitem(shim._state, "aisuite_create", lambda self, model, messages, **kw: seen.append(model))
+    shim.aisuite_create(None, "anthropic:claude-x", [])
+    shim.aisuite_create(None, "openai:gpt-4.1", [])
+    assert seen == ["openai:claude-x", "openai:gpt-4.1"]
+
+
+def test_retry_seconds_reads_the_delay():
+    assert shim.retry_seconds(RuntimeError("Please retry in 12.5s.")) == 13.5
+    assert shim.retry_seconds(RuntimeError("'retryDelay': '33s'")) == 34
+    assert shim.retry_seconds(RuntimeError("busy")) == 30.0

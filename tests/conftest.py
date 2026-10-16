@@ -75,8 +75,8 @@ def course_map() -> CourseMap:
                      lessons=lessons)
 
 
-class FakeClaude:
-    """Stands in for coursedigest.claude.Claude: returns canned objects per output type."""
+class FakeLLM:
+    """Stands in for coursedigest.llm.LLM: returns canned objects per output type."""
 
     model = "fake-model"
 
@@ -84,7 +84,7 @@ class FakeClaude:
         self.fail_on = fail_on
         self.prompts: list[str] = []
 
-    def structured(self, system, user, output, cache_dir, key, effort="medium", max_tokens=16000):
+    def structured(self, system, user, output, cache_dir, key):
         self.prompts.append(user)
         if self.fail_on and self.fail_on in user:
             raise RuntimeError("boom")
@@ -93,6 +93,3 @@ class FakeClaude:
         if output is CourseNotes:
             return course_notes()
         raise AssertionError(output)
-
-    def cost_usd(self) -> float:
-        return 0.0

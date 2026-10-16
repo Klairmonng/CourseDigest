@@ -1,4 +1,4 @@
-"""Run each ungraded lab with Claude behind its model calls (shim.py), then have Claude explain it."""
+"""Run each ungraded lab with the configured model behind its calls (shim.py), then have the model explain it."""
 from __future__ import annotations
 
 import base64
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import nbformat
 
-from .claude import Claude, cache_key
+from .llm import LLM, cache_key
 from .digest import DIAGRAM_RULES
 from .models import LabInfo, LabNotes, LabRun, LabWalkthrough
 
@@ -148,7 +148,7 @@ def lab_prompt(info: LabInfo, notebook, images: list[str], errors: list[str], tr
             f"Model calls ({len(trace)}):\n" + "\n\n".join(calls))
 
 
-def run_lab(lab_dir: Path, python: Path, env: dict, claude: Claude, cache_dir: Path) -> LabWalkthrough:
+def run_lab(lab_dir: Path, python: Path, env: dict, llm: LLM, cache_dir: Path) -> LabWalkthrough:
     info = LabInfo.model_validate_json((lab_dir / "lab.json").read_text("utf-8"))
     trace_path = lab_dir / "trace.jsonl"
     trace_path.unlink(missing_ok=True)
@@ -173,15 +173,15 @@ def run_lab(lab_dir: Path, python: Path, env: dict, claude: Claude, cache_dir: P
                                  folder=lab_dir.name, run=run, images=images)
     prompt = lab_prompt(info, notebook, images, errors, trace)
     try:
-        walkthrough.notes = claude.structured(LAB_SYSTEM, prompt, LabNotes, cache_dir,
-                                              cache_key(claude.model, PROMPT_VERSION, prompt))
+        walkthrough.notes = llm.structured(LAB_SYSTEM, prompt, LabNotes, cache_dir,
+                                           cache_key(llm.model, PROMPT_VERSION, prompt))
     except Exception as exc:
         log.error("lab %s walkthrough failed: %s", info.meta.name, exc)
         walkthrough.run.message = f"walkthrough failed: {exc}"
     return walkthrough
 
 
-def run_labs(slug: str, root: Path, claude: Claude) -> list[LabWalkthrough]:
+def run_labs(slug: str, root: Path, llm: LLM) -> list[LabWalkthrough]:
     labs_dir = root / "labs"
     course_dir = labs_dir / slug
     lab_dirs = sorted(p.parent for p in course_dir.glob("*/lab.json"))
@@ -191,11 +191,15 @@ def run_labs(slug: str, root: Path, claude: Claude) -> list[LabWalkthrough]:
     requirements = course_dir / "requirements.txt"
     python = ensure_venv(labs_dir, requirements if requirements.exists() else None)
     env = {**os.environ, "IPYTHONDIR": str(startup_dir(labs_dir, Path(__file__).resolve().parent.parent)),
-           "COURSEDIGEST_MODEL": claude.model, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8"}
+           "COURSEDIGEST_MODEL": llm.model, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8",
+           # every OpenAI client the lab builds talks to the configured provider
+           "OPENAI_API_KEY": os.environ[llm.api_key_name]}
+    if llm.base_url:
+        env["OPENAI_BASE_URL"] = llm.base_url
     walkthroughs = []
     for lab_dir in lab_dirs:
         log.info("running lab %s", lab_dir.name)
-        walkthrough = run_lab(lab_dir, python, env, claude, root / "cache" / slug / "claude")
+        walkthrough = run_lab(lab_dir, python, env, llm, root / "cache" / slug / "llm")
         (lab_dir / "walkthrough.json").write_text(walkthrough.model_dump_json(indent=2), "utf-8")
         walkthroughs.append(walkthrough)
     return walkthroughs
