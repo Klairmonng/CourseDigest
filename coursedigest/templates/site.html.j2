@@ -26,7 +26,8 @@ h3{font-size:18px;margin:4px 0 6px;line-height:1.3}
 .stat span{color:var(--muted);font-size:13px}
 nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);
 border-bottom:1px solid var(--line)}
-nav .in{display:flex;gap:4px;overflow-x:auto;padding-top:8px;padding-bottom:8px}
+nav .in{display:flex;gap:4px;overflow-x:auto;padding-top:8px;padding-bottom:8px;scrollbar-width:none}
+nav .in::-webkit-scrollbar{display:none}
 nav a{text-decoration:none;color:var(--ink);padding:5px 12px;border-radius:999px;white-space:nowrap;font-size:14px}
 nav a:hover{background:var(--accent-soft)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0;
@@ -43,7 +44,7 @@ box-shadow:var(--shadow)}
 .lesson.imp-must{border-left:4px solid var(--accent)}
 .lesson.imp-good{border-left:4px solid var(--good)}
 .lesson.imp-skip{border-left:4px solid var(--skip)}
-.lab{border-left:4px solid var(--lab)}
+.card.lab{border-left:4px solid var(--lab)}
 .tldr{font-weight:600;margin:6px 0 10px}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:760px){.cols{grid-template-columns:1fr}}

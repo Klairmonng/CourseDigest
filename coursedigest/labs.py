@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -152,6 +153,8 @@ def run_lab(lab_dir: Path, python: Path, env: dict, llm: LLM, cache_dir: Path) -
     info = LabInfo.model_validate_json((lab_dir / "lab.json").read_text("utf-8"))
     trace_path = lab_dir / "trace.jsonl"
     trace_path.unlink(missing_ok=True)
+    for previous in ("outputs", "assets"):  # images from an earlier run
+        shutil.rmtree(lab_dir / previous, ignore_errors=True)
     started = time.time()
     executed, message = execute(python, lab_dir, info.notebook,
                                 {**env, "COURSEDIGEST_TRACE": str(trace_path)})
