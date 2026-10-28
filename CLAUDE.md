@@ -14,19 +14,20 @@ Turn ~10-hour DeepLearning.AI courses (3-4 learning paths) into short, visual, p
 # STRUCTURE
 - `coursedigest/` - the CLI (`coursedigest login | fetch | digest | labs | site | all`)
   - `fetch.py` - DeepLearning.AI fetcher: logged-in browser profile, lesson data and captions from the page's `__NEXT_DATA__`, ungraded lab files from the lab's Jupyter server
-  - `digest.py` - Claude digest per lesson + one course-level synthesis, cached by input hash
-  - `labs.py` - runs ungraded labs in `labs/.venv` with `shim.py` loaded at kernel start, then has Claude write a walkthrough
-  - `shim.py` - routes the labs' OpenAI / aisuite / Anthropic calls to Claude and records each call to `trace.jsonl`
+  - `llm.py` - the one model helper (OpenAI SDK; Gemini free tier by default, OpenAI optional) + cache key
+  - `digest.py` - model digest per lesson + one course-level synthesis, cached by input hash
+  - `labs.py` - runs ungraded labs in `labs/.venv` with `shim.py` loaded at kernel start, then has the model write a walkthrough
+  - `shim.py` - runs the labs' OpenAI / aisuite / Anthropic calls on the configured model and records each call to `trace.jsonl`
   - `site.py` + `templates/` - static visual site per course
   - `models.py` - data contracts (pydantic)
 - `digests/<course>.json` - committed digests
-- `labs/<course>/<lab>/` - lab files, executed notebook, trace, walkthrough
+- `labs/<course>/<lab>/` - lab files, executed notebook, trace, walkthrough; `coursedigest.json` = per-lab services/env the course platform provides (rerun one lab: `labs <course> --only <NN>`)
 - `tests/` - pytest
 - `.10x/` - team decisions, ADRs, specs
 - Local only (gitignored): `.env`, `.venv/`, `labs/.venv/`, `cache/`, `site/`, `.profile/`
 
 # RULES
-- Model: `claude-opus-5-5` for digests, walkthroughs and the lab shim, unless the user names another.
+- Models: no paid API use. Gemini free tier (`gemini-flash-latest`, then `gemini-flash-lite-latest` when a daily quota is spent) through the OpenAI SDK; `LLM_PROVIDER` / `LLM_MODEL` in `.env` switch it.
 - Ungraded material only: never fetch, run or store quizzes or graded labs.
 - Raw transcripts stay in `cache/`; committed output is our own summaries.
 - The repo stays private; lab files come from the user's own course access.

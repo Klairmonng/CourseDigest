@@ -1,0 +1,130 @@
+{
+  "slug": "cnd59gh0b",
+  "title": "Ungraded Lab: Market Research Team",
+  "module": "Module 5 - Patterns for Highly Autonomous Agents",
+  "folder": "44-M5_UGL_2",
+  "run": {
+    "status": "ok",
+    "cells": 15,
+    "errors": 0,
+    "calls": 12,
+    "input_tokens": 12822,
+    "output_tokens": 2859,
+    "seconds": 179,
+    "message": ""
+  },
+  "images": [
+    "file-generated_image-0f0ef8f0.png"
+  ],
+  "notes": {
+    "goal": "Build an automated multi-agent marketing pipeline that researches fashion trends, matches them with an internal product catalog, generates a campaign visual and quote, and compiles an executive report.",
+    "pattern": "Multi-agent workflow",
+    "diagram": {
+      "kind": "flow",
+      "title": "Summer Campaign Pipeline",
+      "nodes": [
+        {
+          "id": "research",
+          "label": "Market Research Agent",
+          "note": "Searches web and product catalog",
+          "group": ""
+        },
+        {
+          "id": "design",
+          "label": "Graphic Designer Agent",
+          "note": "Creates prompt and generates image",
+          "group": ""
+        },
+        {
+          "id": "copy",
+          "label": "Copywriter Agent",
+          "note": "Writes campaign quote from image",
+          "group": ""
+        },
+        {
+          "id": "package",
+          "label": "Packaging Agent",
+          "note": "Builds executive markdown report",
+          "group": ""
+        }
+      ],
+      "edges": [
+        {
+          "source": "research",
+          "target": "design",
+          "label": "trend insights"
+        },
+        {
+          "source": "design",
+          "target": "copy",
+          "label": "image and trends"
+        },
+        {
+          "source": "copy",
+          "target": "package",
+          "label": "quote and justification"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "title": "Setup Tools and Environment",
+        "what_happens": "Load environment variables, set up the aisuite client, and test the search and product catalog tools to ensure external data access.",
+        "code_ref": "tools.tavily_search_tool",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Run Market Research Agent",
+        "what_happens": "The agent queries live web trends for summer sunglasses and reviews the internal product catalog to recommend items that fit current fashions.",
+        "code_ref": "market_research_agent",
+        "call_refs": [
+          1,
+          2,
+          7,
+          8
+        ],
+        "image": ""
+      },
+      {
+        "title": "Run Graphic Designer Agent",
+        "what_happens": "Transforms the research brief into an image generation prompt and caption, then invokes the image model to save a visual asset.",
+        "code_ref": "graphic_designer_agent",
+        "call_refs": [
+          3,
+          4,
+          9,
+          10
+        ],
+        "image": "file-generated_image-0f0ef8f0.png"
+      },
+      {
+        "title": "Run Copywriter Agent",
+        "what_happens": "Analyzes the generated image alongside the trend summary using multimodal capabilities to craft a short, elegant campaign quote.",
+        "code_ref": "copywriter_agent",
+        "call_refs": [
+          5,
+          11
+        ],
+        "image": ""
+      },
+      {
+        "title": "Run Packaging Agent",
+        "what_happens": "Rewrites the trend summary for an executive audience, combines all assets into a formatted Markdown report, and saves it locally.",
+        "code_ref": "packaging_agent",
+        "call_refs": [
+          6,
+          12
+        ],
+        "image": ""
+      }
+    ],
+    "results": "The pipeline executed successfully through all 12 model calls, gathering trend data, generating campaign visuals, writing marketing copy, and compiling a complete executive report without errors.",
+    "try_next": [
+      "Modify the market research agent prompt to target winter ski eyewear instead of summer sunglasses.",
+      "Change the copywriter agent instructions to generate a longer, punchier slogan instead of a short quote.",
+      "Add a review agent step that checks the executive report quality before saving it to disk.",
+      "Swap out the image generation model parameters to alter the aspect ratio or style of the campaign visual."
+    ]
+  }
+}

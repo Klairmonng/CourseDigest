@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "index": 24,
+    "slug": "536julvp0",
+    "name": "Ungraded Lab: Turning functions into tools",
+    "type": "notebook",
+    "seconds": 900,
+    "module": "Module 3 - Tool use"
+  },
+  "notebook": "M3_UGL_1.ipynb",
+  "source_dir": "M3/ungraded_labs/M3_UGL_1"
+}

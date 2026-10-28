@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "index": 15,
+    "slug": "uz37vtiou",
+    "name": "Ungraded Lab: Chart Generation",
+    "type": "notebook",
+    "seconds": 900,
+    "module": "Module 2 - Reflection Design Pattern"
+  },
+  "notebook": "M2_UGL_1.ipynb",
+  "source_dir": "M2/ungraded_labs/M2_UGL_1"
+}

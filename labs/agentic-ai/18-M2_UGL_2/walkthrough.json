@@ -1,0 +1,132 @@
+{
+  "slug": "2ftgl7o8f",
+  "title": "Ungraded Lab: Improving SQL Generation with Reflection",
+  "module": "Module 2 - Reflection Design Pattern",
+  "folder": "18-M2_UGL_2",
+  "run": {
+    "status": "ok",
+    "cells": 13,
+    "errors": 0,
+    "calls": 5,
+    "input_tokens": 1018,
+    "output_tokens": 422,
+    "seconds": 100,
+    "message": ""
+  },
+  "images": [],
+  "notes": {
+    "goal": "Build an agentic SQL generation workflow that uses the reflection pattern and execution feedback to review and refine database queries.",
+    "pattern": "reflection",
+    "diagram": {
+      "kind": "flow",
+      "title": "SQL Generation with Reflection Workflow",
+      "nodes": [
+        {
+          "id": "schema",
+          "label": "Extract Schema",
+          "note": "Get table structure",
+          "group": ""
+        },
+        {
+          "id": "gen",
+          "label": "Generate V1 SQL",
+          "note": "Initial query draft",
+          "group": ""
+        },
+        {
+          "id": "exec1",
+          "label": "Execute V1",
+          "note": "Run query against database",
+          "group": ""
+        },
+        {
+          "id": "reflect",
+          "label": "Reflect & Refine",
+          "note": "Review output and improve",
+          "group": ""
+        },
+        {
+          "id": "exec2",
+          "label": "Execute V2",
+          "note": "Run final polished query",
+          "group": ""
+        }
+      ],
+      "edges": [
+        {
+          "source": "schema",
+          "target": "gen",
+          "label": "schema info"
+        },
+        {
+          "source": "gen",
+          "target": "exec1",
+          "label": "sql v1"
+        },
+        {
+          "source": "exec1",
+          "target": "reflect",
+          "label": "query output"
+        },
+        {
+          "source": "reflect",
+          "target": "exec2",
+          "label": "sql v2"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "title": "Setup Environment and Database",
+        "what_happens": "Imports necessary libraries, sets up the aisuite client, and populates a local SQLite database called products.db with mock transaction data.",
+        "code_ref": "utils.create_transactions_db",
+        "call_refs": [],
+        "image": ""
+      },
+      {
+        "title": "Generate Initial SQL (V1)",
+        "what_happens": "Takes the user's natural language question and the database schema to draft a first version of the SQL query using an LLM.",
+        "code_ref": "generate_sql",
+        "call_refs": [
+          1
+        ],
+        "image": ""
+      },
+      {
+        "title": "Execute V1 and Review Text-Based Reflection",
+        "what_happens": "Runs the V1 query against the database to inspect its results, and tests text-only reflection where the model reviews the SQL without execution output.",
+        "code_ref": "refine_sql",
+        "call_refs": [
+          2
+        ],
+        "image": ""
+      },
+      {
+        "title": "Refine SQL with External Feedback",
+        "what_happens": "Passes actual query execution results back to the LLM so it can evaluate real data outputs, catch subtle logic errors, and output a refined query.",
+        "code_ref": "refine_sql_external_feedback",
+        "call_refs": [
+          3
+        ],
+        "image": ""
+      },
+      {
+        "title": "Run End-to-End Workflow",
+        "what_happens": "Combines all steps into a single automated pipeline that extracts schemas, generates V1, executes it, reflects using execution feedback, and executes V2.",
+        "code_ref": "run_sql_workflow",
+        "call_refs": [
+          4,
+          5
+        ],
+        "image": ""
+      }
+    ],
+    "results": "Our run successfully executed all steps without errors. The model generated initial and refined SQL queries, interacted with the SQLite database, and successfully used external execution feedback to evaluate and confirm the final query output.",
+    "try_next": [
+      "Change the user question to ask about the brand with the highest unit price instead of product color.",
+      "Try swapping the model_generation and model_evaluation parameters to use different LLMs like gpt-4.1-mini.",
+      "Modify the reflection prompt to explicitly check for negative quantity signs in sales data.",
+      "Inspect the schema fields more closely and write a query involving timestamps or date ranges."
+    ]
+  }
+}
