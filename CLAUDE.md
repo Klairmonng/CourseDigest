@@ -12,7 +12,7 @@
 Turn ~10-hour DeepLearning.AI courses (3-4 learning paths) into short, visual, plain-English digests: what each lesson teaches, a worked example, a diagram, the moments worth watching, and every ungraded lab run end to end with a visual walkthrough.
 
 # STRUCTURE
-- `coursedigest/` - the CLI (`coursedigest login | fetch | digest | labs | site | all`)
+- `coursedigest/` - the CLI (`coursedigest login | fetch | digest | labs | jupyter | site | all`)
   - `fetch.py` - DeepLearning.AI fetcher: logged-in browser profile, lesson data and captions from the page's `__NEXT_DATA__`, ungraded lab files from the lab's Jupyter server
   - `llm.py` - the one model helper (OpenAI SDK; Gemini free tier by default, OpenAI optional) + cache key
   - `digest.py` - model digest per lesson + one course-level synthesis, cached by input hash
@@ -21,7 +21,7 @@ Turn ~10-hour DeepLearning.AI courses (3-4 learning paths) into short, visual, p
   - `site.py` + `templates/` - static visual site per course
   - `models.py` - data contracts (pydantic)
 - `digests/<course>.json` - committed digests
-- `labs/<course>/<lab>/` - lab files, executed notebook, trace, walkthrough; `coursedigest.json` = per-lab services/env the course platform provides (rerun one lab: `labs <course> --only <NN>`)
+- `labs/<course>/<lab>/` - lab files, executed notebook, trace, walkthrough; `coursedigest.json` = per-lab services/env the course platform provides (rerun one lab: `labs <course> --only <NN>`; run one live in JupyterLab: `jupyter <course> <NN>`)
 - `tests/` - pytest
 - `.10x/` - team decisions, ADRs, specs
 - Local only (gitignored): `.env`, `.venv/`, `labs/.venv/`, `cache/`, `site/`, `.profile/`

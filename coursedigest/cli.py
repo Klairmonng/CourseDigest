@@ -1,4 +1,4 @@
-"""Command line: coursedigest login | fetch | digest | labs | site | all."""
+"""Command line: coursedigest login | fetch | digest | labs | jupyter | site | all."""
 from __future__ import annotations
 
 import argparse
@@ -27,6 +27,9 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("course", help="course URL or slug")
         if name == "labs":
             command.add_argument("--only", nargs="+", metavar="PREFIX", help="lab folders to run, e.g. 25 44")
+    jupyter = commands.add_parser("jupyter", help="open one lab in JupyterLab to run live (Ctrl+C to stop)")
+    jupyter.add_argument("course", help="course URL or slug")
+    jupyter.add_argument("lab", metavar="PREFIX", help="lab folder prefix, e.g. 25")
     return parser
 
 
@@ -55,6 +58,11 @@ def run(args: argparse.Namespace, root: Path) -> int:
         return 0
 
     slug = course_slug(args.course)
+    if args.command == "jupyter":
+        from .labs import open_lab
+        from .llm import LLM
+        open_lab(slug, root, LLM(), args.lab)
+        return 0
     if args.command in ("fetch", "all"):
         from .fetch import fetch_course
         course = fetch_course(args.course, root, force=getattr(args, "force", False),

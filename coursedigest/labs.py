@@ -237,22 +237,34 @@ def run_lab(lab_dir: Path, python: Path, env: dict, llm: LLM, cache_dir: Path) -
     return walkthrough
 
 
-def run_labs(slug: str, root: Path, llm: LLM, only: list[str] | None = None) -> list[LabWalkthrough]:
-    labs_dir = root / "labs"
-    course_dir = labs_dir / slug
-    lab_dirs = sorted(p.parent for p in course_dir.glob("*/lab.json")
-                      if not only or any(p.parent.name.startswith(prefix) for prefix in only))
-    if not lab_dirs:
-        log.warning("no labs in %s - run fetch first", course_dir)
-        return []
-    requirements = course_dir / "requirements.txt"
-    python = ensure_venv(labs_dir, requirements if requirements.exists() else None)
+def find_labs(course_dir: Path, only: list[str] | None) -> list[Path]:
+    return sorted(p.parent for p in course_dir.glob("*/lab.json")
+                  if not only or any(p.parent.name.startswith(prefix) for prefix in only))
+
+
+def lab_env(labs_dir: Path, llm: LLM) -> dict:
+    """Environment for a lab kernel: the shim loads at start and every OpenAI client talks to the configured provider."""
     env = {**os.environ, "IPYTHONDIR": str(startup_dir(labs_dir, Path(__file__).resolve().parent.parent)),
-           "COURSEDIGEST_MODELS": ",".join(llm.models), "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8",
-           # every OpenAI client the lab builds talks to the configured provider
+           "COURSEDIGEST_MODELS": ",".join(llm.models), "PYTHONIOENCODING": "utf-8",
            "OPENAI_API_KEY": os.environ[llm.api_key_name]}
     if llm.base_url:
         env["OPENAI_BASE_URL"] = llm.base_url
+    return env
+
+
+def lab_python(course_dir: Path) -> Path:
+    requirements = course_dir / "requirements.txt"
+    return ensure_venv(course_dir.parent, requirements if requirements.exists() else None)
+
+
+def run_labs(slug: str, root: Path, llm: LLM, only: list[str] | None = None) -> list[LabWalkthrough]:
+    labs_dir = root / "labs"
+    lab_dirs = find_labs(labs_dir / slug, only)
+    if not lab_dirs:
+        log.warning("no labs in %s - run fetch first", labs_dir / slug)
+        return []
+    python = lab_python(labs_dir / slug)
+    env = {**lab_env(labs_dir, llm), "MPLBACKEND": "Agg"}
     walkthroughs = []
     for lab_dir in lab_dirs:
         log.info("running lab %s", lab_dir.name)
@@ -260,3 +272,28 @@ def run_labs(slug: str, root: Path, llm: LLM, only: list[str] | None = None) -> 
         (lab_dir / "walkthrough.json").write_text(walkthrough.model_dump_json(indent=2), "utf-8")
         walkthroughs.append(walkthrough)
     return walkthroughs
+
+
+def open_lab(slug: str, root: Path, llm: LLM, prefix: str) -> None:
+    """Open one lab in JupyterLab to run by hand, set up like a `labs` run (shim, services, env).
+    The trace goes to cache/<course>/live/ so the committed run stays as it is."""
+    labs_dir = root / "labs"
+    lab_dirs = find_labs(labs_dir / slug, [prefix])
+    if len(lab_dirs) != 1:
+        raise SystemExit(f"expected one lab folder starting with {prefix!r} in {labs_dir / slug}, found {len(lab_dirs)}")
+    lab_dir = lab_dirs[0]
+    info = LabInfo.model_validate_json((lab_dir / "lab.json").read_text("utf-8"))
+    python = lab_python(labs_dir / slug)
+    trace = root / "cache" / slug / "live" / lab_dir.name / "trace.jsonl"
+    trace.parent.mkdir(parents=True, exist_ok=True)
+    env = {**lab_env(labs_dir, llm), "COURSEDIGEST_TRACE": str(trace)}
+    services, service_env = start_services(python, lab_dir, env)
+    try:
+        subprocess.run([str(python), "-m", "jupyter", "lab", info.notebook,
+                        f"--MappingKernelManager.default_kernel_name={KERNEL}"],
+                       cwd=lab_dir, env={**env, **service_env})
+    except KeyboardInterrupt:
+        pass
+    finally:
+        for process in services:
+            process.terminate()
