@@ -1,9 +1,14 @@
+import base64
+
+import nbformat
 import pytest
 
-from coursedigest import site
-from coursedigest.models import CourseDigest, LabNotes, LabRun, LabStep, LabWalkthrough, LessonDigest
+from coursedigest import labs, site
+from coursedigest.models import (CourseDigest, LabInfo, LabNotes, LabRun, LabStep, LabWalkthrough, LessonDigest,
+                                 LessonMeta)
 
 from .conftest import course_notes, diagram, lesson_notes
+from .test_labs import PNG
 
 
 @pytest.mark.parametrize("kind", ["flow", "cycle", "hub", "compare", "layers"])
@@ -47,6 +52,17 @@ def test_build_site_renders_lessons_labs_and_escapes(tmp_path, course_map):
                        steps=[LabStep(title="Draft", what_happens="Writes v1.", code_ref="draft()", call_refs=[1],
                                       image="cell03-abc.png")], results="Worked.", try_next=["Change the prompt."]))
     (lab_dir / "walkthrough.json").write_text(walkthrough.model_dump_json(), "utf-8")
+    meta = LessonMeta(index=4, slug="bb2", name="Ungraded Lab: Try it", type="notebook", seconds=60, module="Module 2")
+    (lab_dir / "lab.json").write_text(LabInfo(meta=meta, notebook="L1.ipynb", source_dir="L1").model_dump_json(), "utf-8")
+    nb = nbformat.v4.new_notebook()
+    nb.cells = [nbformat.v4.new_markdown_cell("### 3.1 Run the **query**\nSome prose."),
+                nbformat.v4.new_code_cell("run_query('<x>')", execution_count=7, outputs=[
+                    nbformat.v4.new_output("stream", name="stderr", text="daily free-tier quota used up for gemini-a\n"),
+                    nbformat.v4.new_output("stream", name="stdout", text="total = -190571.46\n"),
+                    nbformat.v4.new_output("display_data", data={
+                        "text/html": '<style>.c{}</style><div class="c" onclick="x()"><b>SQL Output</b>'
+                                     '<script>steal()</script><table><tr><td>blue</td></tr></table></div>'})])]
+    nbformat.write(nb, lab_dir / "L1.executed.ipynb")
     (lab_dir / "trace.jsonl").write_text(
         '{"i": 1, "api": "openai.chat", "requested_model": "gpt-4.1", "ms": 1200, "error": "", "system": "", '
         '"messages": [{"role": "user", "content": "</script> [image: assets/x.png]"}], "output": "ok", '
@@ -59,6 +75,20 @@ def test_build_site_renders_lessons_labs_and_escapes(tmp_path, course_map):
     assert 'src="assets/04-L1/outputs/cell03-abc.png"' in page
     assert (tmp_path / "site" / "demo-course" / "assets" / "04-L1" / "outputs" / "cell03-abc.png").exists()
     assert 'class="chip none"' in page  # the quiz is shown as not covered
+    # the executed notebook: heading, code and its real output, without the lab's markup or our quota notices
+    assert "3.1 Run the query" in page and "In [7]" in page and "run_query(&#39;&lt;x&gt;&#39;)" in page
+    assert "total = -190571.46" in page and "<b>SQL Output</b><table><tr><td>blue</td></tr></table>" in page
+    assert "quota used up" not in page and "onclick" not in page and "steal()" not in page
+
+
+def test_clean_html_keeps_structure_and_maps_images():
+    raw = base64.b64decode(PNG)
+    html = (f'<head><title>t</title></head><div style="x"><a href="javascript:x()">link</a>'
+            f'<img src="data:image/png;base64,{PNG}"><img src="http://example.com/x.png"><span>open')
+    saved = lambda src: "assets/L/outputs/a.png" if src == f"data:image/png;base64,{PNG}" else ""
+    assert site.clean_html(html, saved) == ('<div>link<img src="assets/L/outputs/a.png" alt="lab output" '
+                                            'loading="lazy"><span>open</span></div>')
+    assert labs.output_name(3, raw, "jpeg").startswith("cell03-") and labs.output_name(3, raw, "jpeg").endswith(".jpg")
 
 
 def test_glossary_dedupes_terms(course_map):

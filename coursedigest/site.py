@@ -1,18 +1,22 @@
 """Static site: one self-contained index.html per course; diagrams are drawn as inline SVG."""
 from __future__ import annotations
 
+import base64
 import json
 import math
 import re
 import shutil
 from dataclasses import dataclass
 from html import escape
+from html.parser import HTMLParser
 from pathlib import Path
 
+import nbformat
 from jinja2 import Environment, PackageLoader
 from markupsafe import Markup
 
-from .models import CourseDigest, Diagram, LabWalkthrough, Node
+from .labs import INLINE_IMAGE, output_name
+from .models import CourseDigest, Diagram, LabInfo, LabWalkthrough, Node
 
 CHAR = 7.0  # average glyph width at 13px
 NOTE_CHAR = 6.2  # at 11.5px
@@ -21,6 +25,12 @@ NOTE_LINE = 15
 PAD = 10
 READ_WPM = 220
 IMAGE_REF = re.compile(r"\[image: assets/([^\]]+)\]")
+HEADING = re.compile(r"^#{1,6}\s+(.+)$", re.M)
+OWN_LOG = re.compile(r"^(daily free-tier quota used up for|could not list models) .*\n?", re.M)  # llm.py's, not the lab's
+KEEP_TAGS = {"b", "strong", "i", "em", "code", "pre", "p", "br", "hr", "div", "span", "ul", "ol", "li", "blockquote",
+             "h1", "h2", "h3", "h4", "h5", "h6", "table", "thead", "tbody", "tr", "th", "td", "img"}
+VOID_TAGS = {"br", "hr", "img"}
+DROP_TAGS = {"style", "script", "head", "title"}
 
 
 # --- diagrams ----------------------------------------------------------------------------------
@@ -267,11 +277,112 @@ def trace_view(folder: str, trace: list[dict]) -> list[dict]:
              "output": fix(t["output"]), "tool_calls": t["tool_calls"], "usage": t["usage"]} for t in trace]
 
 
+class CleanHTML(HTMLParser):
+    """Lab output HTML cut down to plain structure: allowed tags only, no attributes, styles and scripts dropped,
+    inline images pointed at the files the run saved (`image_src` returns "" to drop one)."""
+
+    def __init__(self, image_src):
+        super().__init__(convert_charrefs=True)
+        self.image_src, self.out, self.open, self.skip = image_src, [], [], 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in DROP_TAGS:
+            self.skip += 1
+        elif self.skip or tag not in KEEP_TAGS:
+            return
+        elif tag == "img":
+            src = self.image_src(dict(attrs).get("src") or "")
+            if src:
+                self.out.append(f'<img src="{escape(src)}" alt="lab output" loading="lazy">')
+        elif tag in VOID_TAGS:
+            self.out.append(f"<{tag}>")
+        else:
+            self.out.append(f"<{tag}>")
+            self.open.append(tag)
+
+    def handle_endtag(self, tag):
+        if tag in DROP_TAGS:
+            self.skip = max(0, self.skip - 1)
+        elif not self.skip and tag in self.open:
+            while self.open:
+                closed = self.open.pop()
+                self.out.append(f"</{closed}>")
+                if closed == tag:
+                    break
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.out.append(escape(data))
+
+    def result(self) -> str:
+        return "".join(self.out) + "".join(f"</{tag}>" for tag in reversed(self.open))
+
+
+def clean_html(html: str, image_src) -> str:
+    parser = CleanHTML(image_src)
+    parser.feed(html)
+    parser.close()
+    return parser.result()
+
+
+def cell_output(output: dict, saved_image) -> dict | None:
+    """One notebook output as {kind: text | stderr | error | html | image, value}, or None if nothing to show."""
+    kind = output.get("output_type")
+    if kind == "stream":
+        text = OWN_LOG.sub("", output.get("text", ""))
+        return {"kind": "stderr" if output.get("name") == "stderr" else "text", "value": text} if text.strip() else None
+    if kind == "error":
+        return {"kind": "error", "value": f"{output.get('ename')}: {output.get('evalue', '')}"}
+    data = output.get("data", {})
+    for mime in ("image/png", "image/jpeg"):
+        if mime in data:
+            src = saved_image(base64.b64decode(data[mime]), mime.split("/")[1])
+            return {"kind": "image", "value": src} if src else None
+    if "text/html" in data:
+        def image_src(src: str) -> str:
+            match = INLINE_IMAGE.fullmatch(src)
+            return saved_image(base64.b64decode(match.group(2)), match.group(1)) if match else ""
+        html = clean_html(data["text/html"], image_src)
+        if re.sub(r"<[^>]+>", "", html).strip() or "<img" in html:
+            return {"kind": "html", "value": Markup(html)}
+    text = data.get("text/markdown") or data.get("text/plain") or ""
+    return {"kind": "text", "value": text} if text.strip() else None
+
+
+def run_cells(lab_dir: Path, walkthrough: LabWalkthrough) -> list[dict]:
+    """The executed notebook for the page: each code cell with the course heading above it, its source and outputs."""
+    info_path = lab_dir / "lab.json"
+    if not info_path.exists():
+        return []
+    info = LabInfo.model_validate_json(info_path.read_text("utf-8"))
+    executed = lab_dir / (Path(info.notebook).stem + ".executed.ipynb")
+    if not executed.exists():
+        return []
+    cells, heading = [], ""
+    for index, cell in enumerate(nbformat.read(executed, as_version=4).cells):
+        if cell.cell_type == "markdown":
+            found = HEADING.search(cell.source)
+            heading = re.sub(r"[*`]", "", found.group(1)).strip() if found else heading
+            continue
+        if cell.cell_type != "code" or not cell.source.strip():
+            continue
+
+        def saved_image(raw: bytes, extension: str, index=index) -> str:
+            name = output_name(index, raw, extension)
+            return f"assets/{walkthrough.folder}/outputs/{name}" if name in walkthrough.images else ""
+
+        outputs = [shown for o in cell.get("outputs", []) if (shown := cell_output(o, saved_image))]
+        cells.append({"n": cell.get("execution_count"), "heading": heading, "source": cell.source, "outputs": outputs})
+        heading = ""
+    return cells
+
+
 def build_site(slug: str, root: Path) -> Path:
     digest = CourseDigest.model_validate_json((root / "digests" / f"{slug}.json").read_text("utf-8"))
     out = root / "site" / slug
     out.mkdir(parents=True, exist_ok=True)
     labs = load_labs(root / "labs" / slug)
+    runs = {w.folder: run_cells(root / "labs" / slug / w.folder, w) for w, _ in labs}
     for walkthrough, _ in labs:
         copy_lab_assets(root / "labs" / slug / walkthrough.folder, out)
     env = Environment(loader=PackageLoader("coursedigest", "templates"), autoescape=True)
@@ -280,7 +391,7 @@ def build_site(slug: str, root: Path) -> Path:
     lab_slugs = {w.slug for w, _ in labs}
     html = env.get_template("site.html.j2").render(
         digest=digest, course=digest.course, notes=digest.notes,
-        lessons={l.slug: l for l in digest.lessons}, labs=labs, lab_slugs=lab_slugs,
+        lessons={l.slug: l for l in digest.lessons}, labs=labs, runs=runs, lab_slugs=lab_slugs,
         glossary=glossary(digest), read_minutes=read_minutes(digest),
         video_minutes=round(digest.course.total_seconds / 60),
         data=Markup(json.dumps({"flashcards": flashcards(digest),

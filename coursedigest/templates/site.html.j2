@@ -103,6 +103,18 @@ margin:4px 0;max-height:320px;overflow:auto;font:12.5px/1.5 ui-monospace,Consola
 .call .k{font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .call img{max-width:260px;display:block;border-radius:6px;margin:6px 0}
 .call.flash{outline:2px solid var(--lab)}
+.run-head{margin:18px 0 4px;font-size:14px}
+.cell{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:8px 0;font-size:13.5px}
+.cell .k{font-weight:700;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cell pre{white-space:pre-wrap;word-break:break-word;background:var(--code);border-radius:8px;padding:8px 10px;
+margin:4px 0;max-height:320px;overflow:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace}
+.cell .out{border-left:3px solid var(--lab);padding-left:10px;margin:8px 0 4px;overflow-x:auto}
+.cell pre.out{border-radius:0 8px 8px 0}
+.cell .out.stderr{color:var(--muted)}
+.cell .out.error{color:var(--warn)}
+.cell .out table{border-collapse:collapse;font-size:12.5px;margin:4px 0}
+.cell .out th,.cell .out td{border:1px solid var(--line);padding:3px 8px;text-align:left;vertical-align:top}
+.cell .out img{max-width:100%;border-radius:6px;display:block;margin:6px 0}
 dl.gloss dt{font-weight:700;margin-top:12px}
 dl.gloss dd{margin:2px 0 0;color:var(--ink)}
 dl.gloss dd small{color:var(--muted)}
@@ -216,7 +228,7 @@ d="M0,0 L10,5 L0,10 z"/></marker></defs></svg>
 {% if labs %}
 <section id="labs">
   <h2>Labs</h2>
-  <p class="muted">Each ungraded lab was run end to end; {{ digest.model }} answered the model calls the lab makes. The numbered calls are the real requests from our run.</p>
+  <p class="muted">Each ungraded lab was run end to end; {{ digest.model }} answered the model calls the lab makes. The numbered calls are the real requests from our run, and "What the code did" shows every code cell with the output it printed.</p>
   {% for w, trace in labs %}{% set n = w.notes %}
   <article class="card lab" id="lab-{{ w.slug }}" data-folder="{{ w.folder }}">
     <div class="meta"><span class="badge lab">Lab</span><span>{{ w.module }}</span>
@@ -241,6 +253,19 @@ d="M0,0 L10,5 L0,10 z"/></marker></defs></svg>
     <p><b>What happened in our run.</b> {{ n.results }}</p>
     {% if n.try_next %}<p><b>Try next</b></p><ul>{% for t in n.try_next %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
     {% else %}<p class="muted">{{ w.run.message or 'No walkthrough was generated.' }}</p>{% endif %}
+    {% set cells = runs[w.folder] %}
+    {% if cells %}<details class="run"><summary>What the code did ({{ cells | length }} code cells, as they ran)</summary>
+      {% for c in cells %}
+      {% if c.heading %}<h5 class="run-head">{{ c.heading }}</h5>{% endif %}
+      <div class="cell"><div class="k">In [{{ c.n or ' ' }}]</div><pre>{{ c.source }}</pre>
+        {% for o in c.outputs %}
+        {% if o.kind == 'image' %}<div class="out"><img loading="lazy" alt="cell output" src="{{ o.value }}"></div>
+        {% elif o.kind == 'html' %}<div class="out">{{ o.value }}</div>
+        {% else %}<pre class="out {{ o.kind }}">{{ o.value }}</pre>{% endif %}
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </details>{% endif %}
     {% if w.images %}<details><summary>All outputs ({{ w.images | length }})</summary><div class="gallery">
       {% for img in w.images %}<img class="shot" loading="lazy" alt="{{ img }}" src="assets/{{ w.folder }}/outputs/{{ img }}">{% endfor %}</div></details>{% endif %}
     {% if trace %}<details class="trace"><summary>Model-call trace ({{ trace | length }})</summary><div class="calls"></div></details>{% endif %}

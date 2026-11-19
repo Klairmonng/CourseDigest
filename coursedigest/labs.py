@@ -97,6 +97,11 @@ def execute(python: Path, lab_dir: Path, notebook: str, env: dict) -> tuple[Path
     return lab_dir / executed, message
 
 
+def output_name(index: int, raw: bytes, extension: str) -> str:
+    """File name in outputs/ for an image cell `index` displayed; the site uses it to find the saved file."""
+    return f"cell{index:02d}-{hashlib.sha1(raw).hexdigest()[:8]}.{extension.replace('jpeg', 'jpg')}"
+
+
 def save_images(notebook, outputs: Path) -> list[str]:
     """Write every image the run displayed to outputs/; return the file names in order."""
     names = []
@@ -108,7 +113,7 @@ def save_images(notebook, outputs: Path) -> list[str]:
             payloads += [(m.group(1), m.group(2)) for m in INLINE_IMAGE.finditer(str(data.get("text/html", "")))]
             for extension, encoded in payloads:
                 raw = base64.b64decode(encoded)
-                name = f"cell{index:02d}-{hashlib.sha1(raw).hexdigest()[:8]}.{extension.replace('jpeg', 'jpg')}"
+                name = output_name(index, raw, extension)
                 if name not in names:
                     (outputs / name).write_bytes(raw)
                     names.append(name)
